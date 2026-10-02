@@ -1,0 +1,4 @@
+sample_id,case_type
+WDBC_022,lowest probability
+WDBC_261,highest probability
+WDBC_039,near boundary

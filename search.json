@@ -1,0 +1,622 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "LIME",
+    "section": "",
+    "text": "Preface\nA fitted model can predict accurately while giving little indication of how it reached one particular prediction. This is common with random forests, gradient boosted trees, support vector machines, and neural networks. It matters in biological work because a prediction about one tumour, patient, or cell is often followed immediately by a second question: which measurements made the model behave this way for this sample?\nLIME, short for Local Interpretable Model Agnostic Explanations, answers that question by studying the fitted model close to one observation. It creates artificial observations, obtains predictions from the original model, and fits a simpler model that approximates those predictions nearby. The result is an explanation of the fitted model’s local behaviour. It is not a model of the biological mechanism and it is not automatically a statement about the population as a whole.\nStart with Understanding LIME.",
+    "crumbs": [
+      "Preface"
+    ]
+  },
+  {
+    "objectID": "index.html#primary-sources",
+    "href": "index.html#primary-sources",
+    "title": "LIME",
+    "section": "Primary sources",
+    "text": "Primary sources\nThe module follows the original paper by Ribeiro, Singh, and Guestrin, “Why Should I Trust You?”: Explaining the Predictions of Any Classifier, and checks current behaviour against the Python repository and documentation, the R lime reference, and the LIME chapter of Christoph Molnar’s Interpretable Machine Learning. Package behaviour described in the practical chapter was verified with Python lime 0.2.0.1 and R lime 0.5.4.",
+    "crumbs": [
+      "Preface"
+    ]
+  },
+  {
+    "objectID": "intuition.html",
+    "href": "intuition.html",
+    "title": "1  Understanding LIME",
+    "section": "",
+    "text": "1.1 One difficult prediction\nSuppose a gradient boosted tree has been trained to classify tumour samples. Its inputs include two biomarkers, an inflammatory marker, age, and several laboratory measurements. For patient A it reports a probability of malignancy of 0.82.\nThe number is useful, but it does not tell us what the fitted model was doing around this patient. Did the prediction depend mainly on biomarker A? Did biomarker B push in the opposite direction? Would a small change in the inflammatory marker alter the prediction, or is the model almost flat there?\nThese questions concern one observation. They differ from asking which features matter most on average across the entire dataset. LIME is a local explanation method. It does not replace the fitted model. It constructs a simple local surrogate model that behaves similarly to the fitted model near the observation being explained.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#local-is-not-global",
+    "href": "intuition.html#local-is-not-global",
+    "title": "1  Understanding LIME",
+    "section": "1.2 Local is not global",
+    "text": "1.2 Local is not global\nA nonlinear model can be pictured as a curved prediction surface. Every position on the surface represents a combination of two biomarker values. Colour represents the model’s predicted disease probability.\n\n\n\n\n\n\n\nFigure 1.1: The complete nonlinear prediction surface and a magnified neighborhood around patient A. Black contours in the local panel come from a linear surrogate fitted only near that patient.\n\n\n\n\nThe left panel of Figure 1.1 shows the whole fitted surface. No single plane can reproduce all its bends. The circle selects a small region around patient A. In the right panel, straight contour lines approximate the surface within that region. Those lines would be wrong in much of the left panel, but global accuracy is not their job.\nThis distinction is the basis of LIME. The original model may be highly nonlinear. A linear surrogate can still be useful when it only has to describe a small neighborhood. A local explanation should never be promoted silently into a global claim.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#the-lime-process",
+    "href": "intuition.html#the-lime-process",
+    "title": "1  Understanding LIME",
+    "section": "1.3 The LIME process",
+    "text": "1.3 The LIME process\nThe method can be followed as six connected stages.\n\n\n\n\n\n\n\nFigure 1.2: The six stages of tabular LIME. LIME selects an observation, generates artificial observations, obtains black-box probabilities, weights observations by proximity, and fits a local surrogate.\n\n\n\n\n1. Choose an observation. Patient A has a fixed set of measured values and a black-box probability of 0.82. LIME explains this prediction, not every prediction made by the model.\n2. Generate modified observations. LIME creates many artificial rows by changing the feature values. These rows are probes. They let us ask how the fitted model behaves when its inputs vary. They are not newly observed patients.\n3. Obtain predictions from the original model. Every artificial row is sent through the already fitted model. LIME uses the model’s output, not the true disease status of these artificial observations.\n\n\n\nObservation\nBiomarker A\nBiomarker B\nModel probability\n\n\n\n\npatient A\n0.65\n-0.25\n0.82\n\n\nartificial 1\n0.51\n-0.18\n0.73\n\n\nartificial 2\n0.77\n-0.34\n0.87\n\n\nartificial 3\n0.30\n0.11\n0.61\n\n\n\nFor classification, the useful output is usually a predicted probability for one class. For regression, it is the fitted numerical response. The artificial rows have no observed outcomes, so class labels such as malignant and benign cannot be the response of the surrogate.\n4. Give nearby observations more influence. An artificial observation very similar to patient A is more relevant to the local question than one far away. LIME therefore gives nearby rows large weights and distant rows small weights. Point size in the lower-left panel of Figure 1.2 represents this influence.\n5. Fit a simple model. For tabular LIME, the surrogate is commonly a sparse weighted linear regression. Its response consists of probabilities such as 0.61, 0.73, 0.82, and 0.87. It is not fitted to zero-one disease outcomes. This is why a linear regression appears inside a classification explanation: it approximates the classifier’s probability surface.\n6. Interpret the local surrogate. The surrogate assigns a weight to each selected feature. The sign indicates which direction the feature moves the surrogate’s prediction for the chosen class. The magnitude describes its influence in this particular local approximation.\n\n\n\n\n\n\n\nFigure 1.3: A typical LIME feature plot for the malignant class. Positive local weights support the selected class and negative weights push against it.\n\n\n\n\nIn Figure 1.3, high biomarker A and low biomarker B support the model’s malignant prediction. Age has little influence in this neighborhood. These weights are not coefficients from the original boosted tree. They are not causal effects. They describe a separate simple model fitted to mimic the original model around patient A.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#why-a-linear-surrogate-can-describe-a-nonlinear-model",
+    "href": "intuition.html#why-a-linear-surrogate-can-describe-a-nonlinear-model",
+    "title": "1  Understanding LIME",
+    "section": "1.4 Why a linear surrogate can describe a nonlinear model",
+    "text": "1.4 Why a linear surrogate can describe a nonlinear model\nThe word linear describes the surrogate, not the original model. A small portion of a curved probability function can often be approximated by a line. Move to another part of the curve and a different line is needed.\n\n\n\n\n\n\n\nFigure 1.4: Three local linear approximations at different positions on one nonlinear probability curve.\n\n\n\n\nThe three colored lines in Figure 1.4 all explain the same black-box model. The left explanation is almost flat. The middle one has a steep positive slope. The right one rises more gently. None is a contradiction. Each describes a different local region.\nThis argument has a limit. Some neighborhoods contain sharp thresholds, several interacting boundaries, or other behaviour that a plane cannot reproduce. LIME can still return coefficients in that situation. The existence of coefficients does not prove that the local surrogate is faithful. Its fit must be checked.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#different-observations-can-have-different-explanations",
+    "href": "intuition.html#different-observations-can-have-different-explanations",
+    "title": "1  Understanding LIME",
+    "section": "1.5 Different observations can have different explanations",
+    "text": "1.5 Different observations can have different explanations\nBecause the fitted surface changes from place to place, two samples can have different explanations even when their predicted probabilities are similar. Biomarker A may receive a positive local weight for one sample, a small weight for another, and a negative weight where the surface bends back. The corresponding value for biomarker B can change at the same time because the model contains an interaction.\nA LIME weight therefore belongs to a feature, an observation, a selected class, a perturbation procedure, and a neighborhood definition together. Removing any of that context changes what the number means.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#near-and-far-from-a-decision-boundary",
+    "href": "intuition.html#near-and-far-from-a-decision-boundary",
+    "title": "1  Understanding LIME",
+    "section": "1.6 Near and far from a decision boundary",
+    "text": "1.6 Near and far from a decision boundary\nThe location of the observation also affects how informative a local explanation can be.\n\n\n\n\n\n\n\nFigure 1.5: Artificial observations near a changing decision boundary and in a flat high-probability region.\n\n\n\n\nNear the boundary in the left panel of Figure 1.5, small changes in the biomarker produce a wide range of model probabilities. The surrogate can estimate a clear local direction. Deep inside the predicted class in the right panel, almost every artificial observation receives a probability near one. A nearly flat explanation is accurate there, but it says little about what would eventually make the prediction cross the boundary. LIME describes the model near the point. It does not automatically search for the nearest way to change the decision.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#what-model-agnostic-means",
+    "href": "intuition.html#what-model-agnostic-means",
+    "title": "1  Understanding LIME",
+    "section": "1.7 What model agnostic means",
+    "text": "1.7 What model agnostic means\nLIME needs a route from inputs to predictions:\n\ninput data → fitted model → predicted probability or numerical response\n\nIt does not need the model’s tree splits, coefficients, gradients, neural network weights, or training algorithm. The same general procedure can therefore probe XGBoost, random forests, support vector machines, and neural networks. This is the meaning of model agnostic.\nThe prediction function still matters. A classifier must return probabilities with columns in a known class order. A preprocessing pipeline must apply exactly the same transformations during explanation as it did during model fitting. Model agnostic does not mean interface agnostic.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#sparse-explanations-and-fidelity",
+    "href": "intuition.html#sparse-explanations-and-fidelity",
+    "title": "1  Understanding LIME",
+    "section": "1.8 Sparse explanations and fidelity",
+    "text": "1.8 Sparse explanations and fidelity\nA local linear model with 100 displayed coefficients is rarely a useful explanation. LIME usually selects a small number of features or the user requests a maximum number. This creates a tradeoff.\n\nFewer features make the explanation shorter and easier to communicate.\nMore features may reproduce the black-box predictions more accurately in the chosen neighborhood.\n\nThe degree to which the surrogate reproduces the original model nearby is called local fidelity. A five-feature explanation with strong local fidelity may be useful. A three-feature explanation with poor fidelity is simple but misleading. The practical chapter shows how both R and Python report a local score.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#classification-multiclass-models-and-regression",
+    "href": "intuition.html#classification-multiclass-models-and-regression",
+    "title": "1  Understanding LIME",
+    "section": "1.9 Classification, multiclass models, and regression",
+    "text": "1.9 Classification, multiclass models, and regression\nFor binary classification, LIME approximates the predicted probability for a selected class. An explanation for malignancy says which local features support or oppose the model’s malignancy probability.\nFor multiclass classification, an explanation is attached to one class at a time. A gene-expression profile may be classified as one of several cell types. Features supporting the T-cell probability need not be the same as those opposing the B-cell probability. Software may default to the most probable class or to a numerical label, so the class must be checked explicitly.\nFor regression, the target is the model’s numerical prediction. A model might predict a cytokine concentration, tumour volume, or continuous drug response. LIME fits the same kind of local surrogate to those predicted numbers.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#interpretable-representations",
+    "href": "intuition.html#interpretable-representations",
+    "title": "1  Understanding LIME",
+    "section": "1.10 Interpretable representations",
+    "text": "1.10 Interpretable representations\nThe black box and the explanation do not always use the same representation. LIME calls the human-facing version the interpretable representation.\nFor tabular data, a continuous measurement can be displayed as a condition such as biomarker_A &gt; 2.3 even though the fitted model received a numerical value. For text, interpretable features commonly indicate whether words or tokens are present. Artificial documents are made by hiding tokens. For images, interpretable features are usually connected regions called superpixels. Artificial images are made by masking selected superpixels.\nThis module focuses on tabular biological data. Text and image LIME use the same broad logic, but their perturbations, distances, and interpretable features are different.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#questions-answered-by-related-methods",
+    "href": "intuition.html#questions-answered-by-related-methods",
+    "title": "1  Understanding LIME",
+    "section": "1.11 Questions answered by related methods",
+    "text": "1.11 Questions answered by related methods\nSeveral model interpretation methods produce feature-based plots. Their questions are different.\n\n\n\n\n\n\n\nMethod\nMain question\n\n\n\n\nLIME\nWhat simple model approximates the fitted model around this observation?\n\n\nSHAP\nHow can the difference between a baseline prediction and this prediction be attributed among features?\n\n\nPermutation importance\nHow much predictive performance is lost when information in a feature is disrupted?\n\n\nCounterfactual explanation\nWhat change to the predictors could change the prediction?\n\n\nGlobal surrogate model\nWhat simple model approximates the black box over a broad portion of the data?\n\n\n\nLIME and SHAP bar charts can look similar, but LIME weights are coefficients from a sampled local surrogate. SHAP values are feature attributions relative to a baseline under a Shapley-value definition. Neither plot should be interpreted from appearance alone.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#when-lime-is-useful",
+    "href": "intuition.html#when-lime-is-useful",
+    "title": "1  Understanding LIME",
+    "section": "1.12 When LIME is useful",
+    "text": "1.12 When LIME is useful\nLIME is useful when the aim is to understand individual predictions from a complicated model. It can help check whether a model uses biologically sensible variables for a particular sample, investigate an unusual or incorrect prediction, compare local behaviour across patients, and communicate one prediction with a small set of features. It is also useful when the model can only be accessed through a prediction function.\nLIME can support model debugging. If laboratory batch indicators repeatedly dominate individual explanations, the fitted model may have learned an unwanted shortcut. That observation is a reason to investigate the data and model. It is not evidence that LIME itself has corrected the problem.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#when-lime-should-be-used-carefully",
+    "href": "intuition.html#when-lime-should-be-used-carefully",
+    "title": "1  Understanding LIME",
+    "section": "1.13 When LIME should be used carefully",
+    "text": "1.13 When LIME should be used carefully\n\n1.13.1 A local explanation is not global importance\nA feature that matters near one patient may be unimportant across most patients. Conversely, a globally important feature can have little effect in a flat local region. Many local explanations can be summarized, but one explanation alone cannot establish population-wide importance.\n\n\n1.13.2 The neighborhood is chosen by the algorithm\nThe definition of nearby is not given by nature. It depends on feature scaling, distance, kernel width, discretization, and sampling. Changing those choices can change the explanation.\n\n\n\n\n\n\n\nFigure 1.6: Three locality kernels. A narrow width concentrates influence close to the observation, while a wide width lets distant perturbations influence the surrogate.\n\n\n\n\nThe narrow curve in Figure 1.6 asks a very local question. The wide curve asks the surrogate to cover a broader region. Neither is universally correct. The width must be judged in the context of the data and the local fit.\n\n\n1.13.3 Artificial observations may be unrealistic\nBiological predictors often move together. If two biomarkers are tightly correlated, sampling them independently can create combinations that are rare or impossible in real samples.\n\n\n\n\n\n\n\nFigure 1.7: Observed correlated biomarkers and independently generated perturbations. Many artificial observations lie outside the narrow region occupied by the real data.\n\n\n\n\nIn Figure 1.7, the fitted model is queried well outside the observed data manifold. Its predictions there may be arbitrary extrapolations. LIME then learns from those predictions. The problem should be inspected rather than assumed away.\n\n\n1.13.4 Correlated features can share or exchange attribution\nWhen two features carry similar information, several local linear models may fit almost equally well. Feature selection may choose biomarker A in one run and its correlated partner in another. A coefficient can also change when the partner is included or removed. This is familiar from regression, but LIME adds random sampling and local weighting to the problem.\n\n\n1.13.5 Sampling introduces variability\nLIME’s artificial neighborhood is random. Repeated runs can produce different selected features and weights.\n\n\n\n\n\n\n\nFigure 1.8: Local weights from repeated explanations with different random seeds. Correlated biomarkers exchange some weight and all estimates vary.\n\n\n\n\nSetting a random seed makes one run reproducible. It does not remove the underlying sensitivity. Repeating an explanation is a direct way to measure it.\n\n\n1.13.6 Poor local fidelity weakens the explanation\n\n\n\n\n\n\n\nFigure 1.9: A high-fidelity linear surrogate and a poor linear surrogate fitted to complicated local behavior.\n\n\n\n\nThe right panel of Figure 1.9 still has a fitted line and coefficients. They should not be interpreted strongly because the line does not reproduce the black-box outputs. Fidelity is an essential diagnostic, not an optional decoration.\n\n\n1.13.7 High-dimensional biological data needs additional care\nGene expression, methylation, and proteomics datasets can contain thousands of correlated predictors. In high dimensions, distances become less discriminating, sparse feature selection becomes unstable, and independently generated rows can move far from the biological manifold. Computation also grows because every perturbation must be passed through the model.\nLIME is not automatically invalid for omics data. It does require stronger checks. Useful options include explaining a biologically meaningful lower-dimensional representation, grouping related variables, using a perturbation generator suited to the data, checking stability across seeds and locality settings, and comparing the result with another interpretation method. If a model was trained on transformed components, explaining the raw genes requires a prediction pipeline that performs the transformation. A label attached to a transformed component should not be presented as if it were a measured gene.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "intuition.html#conceptual-summary",
+    "href": "intuition.html#conceptual-summary",
+    "title": "1  Understanding LIME",
+    "section": "1.14 Conceptual summary",
+    "text": "1.14 Conceptual summary\nLIME creates artificial observations, asks the fitted model to predict them, gives nearby observations more influence, and fits an interpretable local surrogate to the resulting model outputs. For classification, those outputs are usually class probabilities. The surrogate may be linear even when the fitted model is nonlinear because it is intended to work only nearby.\nThe explanation belongs to one observation and one class. It depends on how the neighborhood is sampled and weighted. It describes the fitted model, not a biological cause. Its feature weights should be read only after checking the class, local fidelity, stability, correlated predictors, and the plausibility of the artificial observations.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Understanding LIME</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html",
+    "href": "practice.html",
+    "title": "2  warning: false",
+    "section": "",
+    "text": "3 Using LIME in R and Python\nf— execute: echo: false",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#packages-and-implementation-versions",
+    "href": "practice.html#packages-and-implementation-versions",
+    "title": "2  warning: false",
+    "section": "3.1 Packages and implementation versions",
+    "text": "3.1 Packages and implementation versions\nThis chapter uses the R package lime 0.5.4 and the original Python package lime 0.2.0.1. The R and Python projects implement the same framework but are not ports of one another. Their defaults differ enough that identical weights should not be expected.\nThe fitted model is XGBoost. Its role is deliberately small: fit a nonlinear classifier, supply class probabilities, and let LIME probe it. The simulation, split, and selected sample IDs are stored in shared files so both languages begin from the same rows.\n\nRPython\n\n\nlibrary(xgboost)\nlibrary(lime)\nlibrary(ggplot2)\n\npackageVersion(\"lime\")\npackageVersion(\"xgboost\")\n[1] '0.5.4'\n[1] '3.2.1.1'\n\n\nimport numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\nimport xgboost as xgb\n\nfrom lime.lime_tabular import LimeTabularExplainer\nfrom sklearn.metrics import accuracy_score, roc_auc_score\n\nimport importlib.metadata\nprint(importlib.metadata.version(\"lime\"))\nprint(xgb.__version__)\n0.2.0.1\n3.4.1\n\n\n\nThe Python API documentation sometimes follows the repository’s development branch. In the released 0.2.0.1 package used here, score is a scalar and local_pred is a one-element array for the most recently fitted class explanation. Code that assumes both are dictionaries will fail with this release.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#shared-simulated-biological-data",
+    "href": "practice.html#shared-simulated-biological-data",
+    "title": "2  warning: false",
+    "section": "3.2 Shared simulated biological data",
+    "text": "3.2 Shared simulated biological data\nThe dataset has 1,200 samples and seven predictors. Disease probability depends on biomarker A, biomarker B, their interaction, a curved effect of biomarker A, inflammation, and age. Three laboratory measurements are noise. The outcome is sampled from the known probability.\nThe nonlinear part is strong enough that a linear model cannot describe the whole surface. It remains simple enough to see what LIME ought to recover locally. Download lime_simulation.csv and selected_cases.csv if working outside the course directory.\n\nRPython\n\n\nsim &lt;- read.csv(\"data/lime_simulation.csv\")\nfeature_cols &lt;- c(\n  \"biomarker_a\", \"biomarker_b\", \"inflammation\", \"age\",\n  \"lab_noise_1\", \"lab_noise_2\", \"lab_noise_3\"\n)\n\ntrain &lt;- sim[sim$split == \"train\", ]\ntest &lt;- sim[sim$split == \"test\", ]\nselected &lt;- read.csv(\"data/selected_cases.csv\")\ncases &lt;- merge(test, selected, by = \"sample_id\")\ncases &lt;- cases[match(selected$sample_id, cases$sample_id), ]\n\ndim(train)\ncases[, c(\"sample_id\", \"case_type\", feature_cols)]\n[1] 900  12\n  sample_id case_type       biomarker_a biomarker_b inflammation   age\n1 S0388    near boundary       -0.695      -0.490         1.911  58.54\n2 S0125    inside class 0      -1.362       0.265        -0.747  52.66\n3 S0029    inside class 1      -0.990      -1.370         0.387  59.41\n\n\nsim = pd.read_csv(\"data/lime_simulation.csv\")\nfeature_cols = [\n    \"biomarker_a\", \"biomarker_b\", \"inflammation\", \"age\",\n    \"lab_noise_1\", \"lab_noise_2\", \"lab_noise_3\",\n]\n\ntrain = sim[sim[\"split\"] == \"train\"].copy()\ntest = sim[sim[\"split\"] == \"test\"].copy()\nselected = pd.read_csv(\"data/selected_cases.csv\")\ncases = selected.merge(test, on=\"sample_id\", how=\"left\")\n\nprint(train.shape)\nprint(cases[[\"sample_id\", \"case_type\", *feature_cols]])\n(900, 12)\n  sample_id       case_type  biomarker_a  biomarker_b  inflammation    age\n0     S0388   near boundary       -0.695       -0.490         1.911  58.54\n1     S0125  inside class 0       -1.362        0.265        -0.747  52.66\n2     S0029  inside class 1       -0.990       -1.370         0.387  59.41",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#known-truth-and-fitted-surface",
+    "href": "practice.html#known-truth-and-fitted-surface",
+    "title": "2  warning: false",
+    "section": "3.3 Known truth and fitted surface",
+    "text": "3.3 Known truth and fitted surface\nThe left panel of Figure 3.1 fixes the other predictors at their training medians and shows the known probability as biomarker A and biomarker B vary. The interaction bends the boundary. The right panel shows the XGBoost fit under the same conditions. Its stepped surface is typical of a tree ensemble.\n\n\n\n\n\n\n\nFigure 3.1: The known simulation probability and the probability learned by XGBoost, with all other predictors fixed at their training medians.\n\n\n\n\nModel fitting is kept identical in purpose. Small prediction differences remain because the R and Python XGBoost interfaces and released library versions are not guaranteed to construct byte-for-byte identical ensembles.\n\nRPython\n\n\ndtrain &lt;- xgb.DMatrix(\n  as.matrix(train[, feature_cols]),\n  label = train$outcome\n)\n\nfit &lt;- xgb.train(\n  params = list(\n    objective = \"binary:logistic\",\n    eval_metric = \"logloss\",\n    max_depth = 3,\n    eta = 0.05,\n    subsample = 0.85,\n    colsample_bytree = 0.9,\n    nthread = 1,\n    seed = 2026\n  ),\n  data = dtrain,\n  nrounds = 250,\n  verbose = 0\n)\n\ntest_probability &lt;- predict(fit, as.matrix(test[, feature_cols]))\ntest_class &lt;- as.integer(test_probability &gt;= 0.5)\n\nauc &lt;- function(y, p) {\n  r &lt;- rank(p)\n  n1 &lt;- sum(y == 1)\n  n0 &lt;- sum(y == 0)\n  (sum(r[y == 1]) - n1 * (n1 + 1) / 2) / (n1 * n0)\n}\n\ncat(\"AUC:\", round(auc(test$outcome, test_probability), 3), \"\\n\")\ncat(\"accuracy:\", round(mean(test_class == test$outcome), 3), \"\\n\")\nAUC: 0.775\naccuracy: 0.713\n\n\nfit = xgb.XGBClassifier(\n    n_estimators=250,\n    max_depth=3,\n    learning_rate=0.05,\n    subsample=0.85,\n    colsample_bytree=0.9,\n    eval_metric=\"logloss\",\n    random_state=2026,\n    n_jobs=1,\n)\nfit.fit(train[feature_cols], train[\"outcome\"])\n\ntest_probability = fit.predict_proba(test[feature_cols])[:, 1]\ntest_class = (test_probability &gt;= 0.5).astype(int)\n\nprint(\"AUC:\", round(roc_auc_score(test[\"outcome\"], test_probability), 3))\nprint(\"accuracy:\", round(accuracy_score(test[\"outcome\"], test_class), 3))\nAUC: 0.779\naccuracy: 0.717\n\n\n\nThe saved cases were selected from the fitted Python model: one probability near 0.5, one near 0.05, and one near 0.95. They are held-out observations. Selection by prediction is appropriate here because the purpose is to compare model behaviour in different regions, not to estimate performance from these three rows.\n\nRPython\n\n\ncase_probability &lt;- predict(fit, as.matrix(cases[, feature_cols]))\ndata.frame(\n  sample_id = cases$sample_id,\n  case_type = cases$case_type,\n  probability_class_1 = round(case_probability, 3)\n)\n  sample_id      case_type probability_class_1\n1     S0388  near boundary               0.616\n2     S0125 inside class 0               0.038\n3     S0029 inside class 1               0.936\n\n\ncase_probability = fit.predict_proba(cases[feature_cols])[:, 1]\npd.DataFrame({\n    \"sample_id\": cases[\"sample_id\"],\n    \"case_type\": cases[\"case_type\"],\n    \"probability_class_1\": np.round(case_probability, 3),\n})\n  sample_id       case_type  probability_class_1\n0     S0388   near boundary                0.501\n1     S0125  inside class 0                0.050\n2     S0029  inside class 1                0.950",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#create-a-lime-explainer",
+    "href": "practice.html#create-a-lime-explainer",
+    "title": "2  warning: false",
+    "section": "3.4 Create a LIME explainer",
+    "text": "3.4 Create a LIME explainer\nAn explainer stores information about the training predictors and the fitted model. It should receive training rows only. Supplying the test set would leak its distribution into the explanation procedure.\n\nRPython\n\n\nexplainer &lt;- lime(\n  x = train[, feature_cols],\n  model = fit,\n  bin_continuous = TRUE,\n  n_bins = 4,\n  quantile_bins = TRUE\n)\nbin_continuous = TRUE is the R default. Each numerical predictor is divided into four quantile bins. The interpretable features indicate whether a value belongs to an interval. With bin_continuous = FALSE, use_density = TRUE samples a numerical feature from a kernel density estimate. Setting use_density = FALSE uses a normal distribution estimated from the training column.\n\n\nexplainer = LimeTabularExplainer(\n    training_data=train[feature_cols].to_numpy(),\n    mode=\"classification\",\n    feature_names=feature_cols,\n    class_names=[\"class 0\", \"class 1\"],\n    discretize_continuous=True,\n    discretizer=\"quartile\",\n    feature_selection=\"auto\",\n    random_state=2026,\n)\nPython also discretizes numerical predictors into quartiles by default. Other built-in discretizers are \"decile\" and supervised \"entropy\". If discretization is off, numerical perturbations come from normal distributions using training means and standard deviations. sample_around_instance=True centers those normal draws on the explained row instead of the training mean. That option does not create conditional samples and has no effect on predictors converted to categorical bins.\n\n\n\nThe class names in Python must follow the order returned by the prediction function. Check it rather than guessing:\nprint(fit.classes_)                       # [0, 1]\nprint(fit.predict_proba(cases[feature_cols]).shape)  # three rows, two classes\nFor this model, probability column 0 is class 0 and column 1 is class 1. The R method for xgb.Booster names its two probability columns \"1\" and \"0\". We therefore request label \"1\" in R and integer label 1 in Python.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#explain-the-three-observations",
+    "href": "practice.html#explain-the-three-observations",
+    "title": "2  warning: false",
+    "section": "3.5 Explain the three observations",
+    "text": "3.5 Explain the three observations\nThe code requests five features and 5,000 perturbations for the class 1 probability. One class is explained per call so there is no ambiguity about the reported fidelity score.\n\nRPython\n\n\nset.seed(2026)\nexplanations &lt;- explain(\n  x = cases[, feature_cols],\n  explainer = explainer,\n  labels = \"1\",\n  n_features = 5,\n  n_permutations = 5000,\n  feature_select = \"auto\",\n  dist_fun = \"gower\"\n)\n\nsuppressWarnings(plot_features(explanations))\n\n\n\n\nR lime feature plots for the three selected observations.\n\n\n\n\n\npython_explanations = {}\n\nfor _, row in cases.iterrows():\n    explanation = explainer.explain_instance(\n        data_row=row[feature_cols].to_numpy(dtype=float),\n        predict_fn=fit.predict_proba,\n        labels=(1,),\n        num_features=5,\n        num_samples=5000,\n        distance_metric=\"euclidean\",\n    )\n    python_explanations[row[\"sample_id\"]] = explanation\n    explanation.as_pyplot_figure(label=1)\n    plt.title(f\"{row['case_type']}: class 1\")\n    plt.tight_layout()\n    plt.show()\n\n\n\n\nPython LIME explanations for the same observations. Each panel also reports the black-box probability, local prediction, and local R-squared.\n\n\n\n\n\n\nRead each plot in local, class-specific language. A positive weight supports class 1 in the surrogate fitted around that row. A negative weight opposes class 1. An interval such as biomarker_a &lt;= -0.66 is a binary interpretable feature. Its weight is not a per-unit slope of biomarker A.\nComparing the cases with the known surface gives a useful check. Biomarker A and biomarker B should usually appear because the true probability depends strongly on them. Inflammation and age may appear with smaller weights. A noise feature can still appear because XGBoost fitted a finite noisy sample and LIME fitted another finite artificial sample. Neither procedure knows the data-generating equation.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#inspect-the-explanation-instead-of-only-plotting-it",
+    "href": "practice.html#inspect-the-explanation-instead-of-only-plotting-it",
+    "title": "2  warning: false",
+    "section": "3.6 Inspect the explanation instead of only plotting it",
+    "text": "3.6 Inspect the explanation instead of only plotting it\n\n3.6.1 R output fields\nexplain() returns one row per selected feature, with explanation-level values repeated down those rows.\nexplanations[, c(\n  \"case\", \"label\", \"label_prob\", \"model_r2\",\n  \"model_prediction\", \"model_intercept\", \"feature\",\n  \"feature_value\", \"feature_weight\", \"feature_desc\"\n)]\ncase  label_prob  model_r2  model_prediction  feature\n1        0.616      0.279        0.210         biomarker_a\n2        0.038      0.329        0.061         biomarker_a\n3        0.936      0.484        0.515         biomarker_a\n\nFive feature rows are returned per case. Explanation-level values repeat.\n\nprediction contains the original model probabilities for all classes.\ndata contains the original row being explained.\nlabel is the class being explained and label_prob is the black-box probability for that class.\nfeature is the original column name. feature_value is its value in the explained row. feature_desc is the human-readable bin or condition.\nfeature_weight is the coefficient in the local ridge regression.\nmodel_intercept and model_prediction belong to the local surrogate. model_prediction should be compared with label_prob, but they need not be equal.\nmodel_r2 is the weighted coefficient of determination on the artificial neighborhood. Values closer to one indicate that the selected local model reproduces more of the variation in black-box probabilities. A low value warns that the coefficients are a weak summary of that neighborhood.\n\nThe first artificial row is the observation being explained. Its black-box probability can differ substantially from model_prediction even when the overall weighted fit is moderate. Inspect both the pointwise difference and model_r2.\n\n\n3.6.2 Python attributes\nrow_id = cases.loc[cases[\"case_type\"] == \"near boundary\", \"sample_id\"].iloc[0]\nexplanation = python_explanations[row_id]\n\nprint(\"black-box probabilities:\", explanation.predict_proba)\nprint(\"feature descriptions and weights:\", explanation.as_list(label=1))\nprint(\"raw feature map:\", explanation.as_map()[1])\nprint(\"local prediction:\", float(explanation.local_pred[0]))\nprint(\"local weighted R-squared:\", float(explanation.score))\nprint(\"local intercept:\", float(explanation.intercept[1]))\nblack-box probabilities: [0.49943 0.50057]\nfeature descriptions and weights:\n  biomarker_a &lt;= -0.66              -0.357\n  inflammation &gt; 0.71                0.087\n  -0.69 &lt; biomarker_b &lt;= -0.03       0.068\n  56.85 &lt; age &lt;= 64.73               0.026\n  -0.02 &lt; lab_noise_1 &lt;= 0.73        0.012\nlocal prediction: 0.326\nlocal weighted R-squared: 0.318\nlocal intercept: 0.490\nas_list() returns displayed feature descriptions and weights. as_map() returns feature identifiers and weights. local_pred is the surrogate’s prediction at the explained row. score is the weighted local R-squared. The current released package stores one score and one local_pred for the last class fitted, so separate calls are safest when explanations for several classes must be audited.\nmodel_regressor in explain_instance() can replace the default ridge regression. A replacement must expose coef_ and accept sample_weight in its fit() method. It should also implement a meaningful score() because that value becomes the reported local score. Changing the regressor changes the explanation and should be documented. The default ridge model is the appropriate starting point for this chapter.\nFor multiclass work, pass the intended numerical class in labels, after checking the prediction-column order. top_labels=k instead asks Python LIME to explain the \\(k\\) classes with the largest probabilities and overrides labels. R offers the parallel choice between explicit labels and n_labels. Explicit labels are preferable when the scientific question names the class in advance.\n\n\n\n\n\n\nImportantA plot is not evidence of a good explanation\n\n\n\nBoth packages can draw an attractive feature plot when local R-squared is low. Interpret the weights only after checking fidelity and the difference between the local and black-box predictions. A poor surrogate should lead to a changed neighborhood, representation, or surrogate, or to the conclusion that this LIME explanation is inadequate.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#why-r-and-python-may-not-give-identical-lime-explanations",
+    "href": "practice.html#why-r-and-python-may-not-give-identical-lime-explanations",
+    "title": "2  warning: false",
+    "section": "3.7 Why R and Python may not give identical LIME explanations",
+    "text": "3.7 Why R and Python may not give identical LIME explanations\nThe two implementations share the general algorithm but differ in important details.\n\n\n\n\n\n\n\n\nChoice\nR lime 0.5.4\nPython lime 0.2.0.1\n\n\n\n\nDefault continuous representation\nFour quantile bins\nQuartile bins\n\n\nDefault tabular distance\nGower\nEuclidean on scaled interpretable data\n\n\nDefault locality\nGower similarity\nExponential kernel, width 0.75 times square root of feature count\n\n\nUndiscretized sampling\nKernel density estimate by default\nIndependent normal draws\n\n\nLocal model\nRidge through glmnet\nScikit-learn ridge\n\n\nAutomatic feature selection\nForward at six or fewer, otherwise highest weights\nSame broad rule, separate implementation\n\n\nRandom generator\nR\nNumPy\n\n\n\nThe current R default with dist_fun = \"gower\" uses similarity equal to one minus Gower distance raised to gower_pow. In that path, kernel_width is not used. When another R distance is requested, scaled distance is passed through the same exponential-kernel form used by Python. This detail is easy to miss if an older vignette is read without checking the current function signature and source.\nThese choices change the artificial rows, their weights, the selected features, and the ridge solution. Agreement in the broad local story is more reasonable to expect than equality of coefficients.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#number-of-explanatory-features",
+    "href": "practice.html#number-of-explanatory-features",
+    "title": "2  warning: false",
+    "section": "3.8 Number of explanatory features",
+    "text": "3.8 Number of explanatory features\nVary the feature budget while leaving the observation, perturbation count, and seed fixed. The result records the simplicity-fidelity tradeoff.\n\nRPython\n\n\none_case &lt;- cases[cases$case_type == \"near boundary\", feature_cols, drop = FALSE]\n\nr_feature_results &lt;- do.call(rbind, lapply(c(3, 5, 7), function(k) {\n  set.seed(2026)\n  ans &lt;- explain(\n    one_case, explainer, labels = \"1\",\n    n_features = k, n_permutations = 5000\n  )\n  data.frame(\n    n_features = k,\n    model_r2 = unique(ans$model_r2),\n    selected = paste(ans$feature, collapse = \", \")\n  )\n}))\nr_feature_results\nn_features  model_r2\n3              0.267\n5              0.270\n7              0.271\n\n\none_case = cases.loc[cases[\"case_type\"] == \"near boundary\", feature_cols].iloc[0]\npython_feature_results = []\n\nfor k in (3, 5, 7):\n    local_explainer = LimeTabularExplainer(\n        train[feature_cols].to_numpy(),\n        mode=\"classification\",\n        feature_names=feature_cols,\n        class_names=[\"class 0\", \"class 1\"],\n        random_state=2026,\n    )\n    ans = local_explainer.explain_instance(\n        one_case.to_numpy(dtype=float), fit.predict_proba,\n        labels=(1,), num_features=k, num_samples=5000,\n    )\n    python_feature_results.append({\n        \"n_features\": k,\n        \"score\": ans.score,\n        \"selected\": \", \".join(name for name, _ in ans.as_list(1)),\n    })\n\npd.DataFrame(python_feature_results)\nn_features  score\n3           0.316\n5           0.318\n7           0.318\n\n\n\nAdding features cannot be assumed to produce a useful improvement. A small increase in local R-squared may not justify doubling the length of an explanation. Conversely, a very sparse explanation with weak fidelity should not be preferred only because its plot is short.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#number-of-perturbations-and-repeated-explanations",
+    "href": "practice.html#number-of-perturbations-and-repeated-explanations",
+    "title": "2  warning: false",
+    "section": "3.9 Number of perturbations and repeated explanations",
+    "text": "3.9 Number of perturbations and repeated explanations\nFive hundred perturbations require fewer model evaluations than 10,000 but usually have more Monte Carlo variability. There is no universal sufficient count. Complexity of the local surface, number of predictors, feature selection, and available computation all matter.\n\nRPython\n\n\nr_repeats &lt;- do.call(rbind, lapply(c(101, 202, 303, 404, 505), function(seed) {\n  set.seed(seed)\n  ans &lt;- explain(\n    one_case, explainer, labels = \"1\",\n    n_features = 5, n_permutations = 1000\n  )\n  transform(\n    ans[, c(\"feature\", \"feature_weight\", \"model_r2\")],\n    seed = seed\n  )\n}))\n\nggplot(r_repeats, aes(seed, feature_weight, color = feature)) +\n  geom_hline(yintercept = 0, color = \"grey70\") +\n  geom_point() +\n  geom_line() +\n  labs(y = \"local weight\", color = \"feature\")\n\n\npython_repeats = []\n\nfor seed in (101, 202, 303, 404, 505):\n    local_explainer = LimeTabularExplainer(\n        train[feature_cols].to_numpy(),\n        mode=\"classification\",\n        feature_names=feature_cols,\n        class_names=[\"class 0\", \"class 1\"],\n        random_state=seed,\n    )\n    ans = local_explainer.explain_instance(\n        one_case.to_numpy(dtype=float), fit.predict_proba,\n        labels=(1,), num_features=5, num_samples=1000,\n    )\n    for feature, weight in ans.as_list(1):\n        python_repeats.append({\n            \"seed\": seed, \"feature\": feature,\n            \"weight\": weight, \"score\": ans.score,\n        })\n\nrepeat_frame = pd.DataFrame(python_repeats)\nfor feature, part in repeat_frame.groupby(\"feature\"):\n    plt.plot(part[\"seed\"], part[\"weight\"], \"o-\", label=feature)\nplt.axhline(0, color=\"grey\", linewidth=1)\nplt.ylabel(\"local weight\")\nplt.legend(bbox_to_anchor=(1.02, 1), loc=\"upper left\")\nplt.show()\n\n\n\nThe repeated fits produce visibly different weights and, for less stable features, different selections. Figure 3.2 shows the same issue in the controlled correlated-biomarker experiment used later in the chapter.\n\n\n\n\n\n\n\nFigure 3.2: Weights obtained by repeating a LIME explanation with different random seeds.\n\n\n\n\nRepeat the code with 10,000 perturbations and compare the spread. More perturbations reduce sampling noise but cannot repair an unsuitable distance, implausible perturbations, severe collinearity, or a linear surrogate that is too simple.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#locality-and-kernel-width",
+    "href": "practice.html#locality-and-kernel-width",
+    "title": "2  warning: false",
+    "section": "3.10 Locality and kernel width",
+    "text": "3.10 Locality and kernel width\nPython scales continuous variables before calculating Euclidean distance. Its default width is 0.75 times the square root of the number of columns. The released code uses the weight exp(-distance² / (2 × width²)).\n\nRPython\n\n\n# R's default Gower path: vary the shape of Gower similarity.\nr_locality &lt;- do.call(rbind, lapply(c(0.5, 1, 2), function(power) {\n  set.seed(2026)\n  ans &lt;- explain(\n    one_case, explainer, labels = \"1\",\n    n_features = 5, n_permutations = 5000,\n    dist_fun = \"gower\", gower_pow = power\n  )\n  transform(\n    ans[, c(\"feature\", \"feature_weight\", \"model_r2\")],\n    gower_pow = power\n  )\n}))\n\n# To study an explicit kernel width instead:\nset.seed(2026)\nr_euclidean &lt;- explain(\n  one_case, explainer, labels = \"1\",\n  n_features = 5, n_permutations = 5000,\n  dist_fun = \"euclidean\", kernel_width = 1\n)\n\n\np = len(feature_cols)\ndefault_width = 0.75 * np.sqrt(p)\npython_locality = []\n\nfor width in (0.5 * default_width, default_width, 2 * default_width):\n    local_explainer = LimeTabularExplainer(\n        train[feature_cols].to_numpy(),\n        mode=\"classification\",\n        feature_names=feature_cols,\n        class_names=[\"class 0\", \"class 1\"],\n        kernel_width=width,\n        random_state=2026,\n    )\n    ans = local_explainer.explain_instance(\n        one_case.to_numpy(dtype=float), fit.predict_proba,\n        labels=(1,), num_features=5, num_samples=5000,\n    )\n    for feature, weight in ans.as_list(1):\n        python_locality.append({\n            \"kernel_width\": width,\n            \"feature\": feature,\n            \"weight\": weight,\n            \"score\": ans.score,\n        })\n\npd.DataFrame(python_locality)\n\n\n\n\n\n\nImplementation and setting\nLocal R-squared\n\n\n\n\nR, Gower power 0.5\n0.269\n\n\nR, Gower power 1\n0.270\n\n\nR, Gower power 2\n0.272\n\n\nPython, half default width\n0.387\n\n\nPython, default width\n0.318\n\n\nPython, twice default width\n0.301\n\n\n\nThe important result is that the weighting rule changes the fitted local problem.\nA narrow kernel focuses on very close rows but can leave too little effective information to estimate stable coefficients. A wide kernel is more stable numerically but asks the linear surrogate to cover more of a curved surface. Changing a coefficient’s sign across reasonable widths is evidence that the explanation depends strongly on what counts as local.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#continuous-features-and-discretization",
+    "href": "practice.html#continuous-features-and-discretization",
+    "title": "2  warning: false",
+    "section": "3.11 Continuous features and discretization",
+    "text": "3.11 Continuous features and discretization\nDiscretization changes both the display and the local model. With quartiles, biomarker_a &lt;= -0.66 is a binary condition. Without discretization, biomarker_a has a coefficient attached to its standardized numerical value in Python’s surrogate. The latter looks like a slope but is still local and scale-dependent.\n\nRPython\n\n\ncontinuous_explainer &lt;- lime(\n  train[, feature_cols], fit,\n  bin_continuous = FALSE,\n  use_density = TRUE\n)\n\nset.seed(2026)\nr_continuous &lt;- explain(\n  one_case, continuous_explainer,\n  labels = \"1\", n_features = 5,\n  n_permutations = 5000\n)\nr_continuous[, c(\"feature_desc\", \"feature_weight\", \"model_r2\")]\nfeature_desc   feature_weight  model_r2\nbiomarker_a          0.177       0.716\nbiomarker_b         -0.139       0.716\ninflammation         0.042       0.716\nlab_noise_3         -0.029       0.716\nage                   0.004       0.716\n\n\ncontinuous_explainer = LimeTabularExplainer(\n    train[feature_cols].to_numpy(),\n    mode=\"classification\",\n    feature_names=feature_cols,\n    class_names=[\"class 0\", \"class 1\"],\n    discretize_continuous=False,\n    sample_around_instance=True,\n    random_state=2026,\n)\n\npython_continuous = continuous_explainer.explain_instance(\n    one_case.to_numpy(dtype=float), fit.predict_proba,\n    labels=(1,), num_features=5, num_samples=5000,\n)\nprint(python_continuous.as_list(1))\nprint(\"score:\", python_continuous.score)\nbiomarker_a       0.179\nbiomarker_b      -0.168\ninflammation     -0.042\nlab_noise_3      -0.040\nage               0.013\nscore: 0.718\n\n\n\nCompare the local score and local prediction, not only the coefficient names. Discretization can make an explanation easier to read while losing within-bin variation. An undiscretized model can fit smooth local changes better but may be harder to communicate and more sensitive to the scaling convention.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#categorical-predictors",
+    "href": "practice.html#categorical-predictors",
+    "title": "2  warning: false",
+    "section": "3.12 Categorical predictors",
+    "text": "3.12 Categorical predictors\nR recognizes factors and character columns. Their observed training frequencies define the perturbation distribution. Keep factor levels consistent between training and new data.\nPython requires categorical columns to be integer encoded before constructing LimeTabularExplainer. Pass their zero-based column positions in categorical_features and a mapping from integer codes to labels in categorical_names:\n# Add a small encoded assay-site example after the seven numerical columns.\ntraining_with_site = train[feature_cols].copy()\ntraining_with_site[\"assay_site\"] = np.arange(len(training_with_site)) % 3\ntraining_array = training_with_site.to_numpy()\nfeature_names = [*feature_cols, \"assay_site\"]\nsite_column = feature_names.index(\"assay_site\")\n\ncategorical_features = [site_column]\ncategorical_names = {site_column: [\"site A\", \"site B\", \"site C\"]}\n\ncategorical_explainer = LimeTabularExplainer(\n    training_array,\n    feature_names=feature_names,\n    categorical_features=categorical_features,\n    categorical_names=categorical_names,\n    mode=\"classification\",\n    random_state=2026,\n)\nThe prediction function must expect the same integer encoding. Do not pass human-readable labels to LIME while passing one-hot encoded columns to the model unless the prediction function explicitly performs that conversion. The interpretable and model representations may differ, but the transformation between them must be exact.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#correlated-predictors",
+    "href": "practice.html#correlated-predictors",
+    "title": "2  warning: false",
+    "section": "3.13 Correlated predictors",
+    "text": "3.13 Correlated predictors\nCreate a second assay that is almost a copy of biomarker A. Refit the classifier with both columns and repeat LIME. The two variables carry almost the same information, so feature selection and weight allocation can move between them.\n\nRPython\n\n\nset.seed(88)\nsim$biomarker_a2 &lt;- sim$biomarker_a + rnorm(nrow(sim), 0, 0.08)\ncor_features &lt;- c(feature_cols, \"biomarker_a2\")\ncor_train &lt;- sim[sim$split == \"train\", ]\ncor_test &lt;- sim[sim$split == \"test\", ]\n\ncor_fit &lt;- xgb.train(\n  params = list(\n    objective = \"binary:logistic\", max_depth = 3,\n    eta = 0.05, nthread = 1, seed = 2026\n  ),\n  data = xgb.DMatrix(as.matrix(cor_train[, cor_features]), label = cor_train$outcome),\n  nrounds = 250,\n  verbose = 0\n)\n\ncor_explainer &lt;- lime(cor_train[, cor_features], cor_fit)\ncor_case &lt;- cor_test[match(selected$sample_id[1], cor_test$sample_id), cor_features, drop = FALSE]\n\ncor_repeats &lt;- do.call(rbind, lapply(1:10, function(seed) {\n  set.seed(seed)\n  ans &lt;- explain(\n    cor_case, cor_explainer, labels = \"1\",\n    n_features = 5, n_permutations = 1000\n  )\n  transform(ans[, c(\"feature\", \"feature_weight\")], seed = seed)\n}))\nsubset(cor_repeats, feature %in% c(\"biomarker_a\", \"biomarker_a2\"))\n\n\nrng = np.random.default_rng(88)\nsim_cor = sim.copy()\nsim_cor[\"biomarker_a2\"] = sim_cor[\"biomarker_a\"] + rng.normal(0, 0.08, len(sim_cor))\ncor_features = [*feature_cols, \"biomarker_a2\"]\ncor_train = sim_cor[sim_cor[\"split\"] == \"train\"]\ncor_test = sim_cor[sim_cor[\"split\"] == \"test\"]\n\ncor_fit = xgb.XGBClassifier(\n    n_estimators=250, max_depth=3, learning_rate=0.05,\n    random_state=2026, n_jobs=1, eval_metric=\"logloss\",\n).fit(cor_train[cor_features], cor_train[\"outcome\"])\n\ncor_case = cor_test.set_index(\"sample_id\").loc[selected.iloc[0][\"sample_id\"], cor_features]\ncor_repeats = []\n\nfor seed in range(1, 11):\n    cor_explainer = LimeTabularExplainer(\n        cor_train[cor_features].to_numpy(),\n        feature_names=cor_features,\n        class_names=[\"class 0\", \"class 1\"],\n        mode=\"classification\", random_state=seed,\n    )\n    ans = cor_explainer.explain_instance(\n        cor_case.to_numpy(dtype=float), cor_fit.predict_proba,\n        labels=(1,), num_features=5, num_samples=1000,\n    )\n    cor_repeats.extend(\n        {\"seed\": seed, \"feature\": feature, \"weight\": weight}\n        for feature, weight in ans.as_list(1)\n        if \"biomarker_a\" in feature\n    )\n\npd.DataFrame(cor_repeats)\n\n\n\nAcross ten R runs, the local weight for biomarker_a2 ranged from about -0.26 to -0.21, while biomarker_a ranged from about -0.19 to -0.13. Python also retained both names in several runs, with their displayed conditions and weights changing across seeds. The result is evidence of attribution sharing, not evidence that the duplicated assay has acquired a new biological role.\nThe experiment does not identify which assay is biologically correct. It shows that the explanation is conditional on a representation containing redundant information. In real omics data, related genes or proteins may exchange importance in the same way.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#unrealistic-perturbations",
+    "href": "practice.html#unrealistic-perturbations",
+    "title": "2  warning: false",
+    "section": "3.14 Unrealistic perturbations",
+    "text": "3.14 Unrealistic perturbations\nFigure 3.3 overlays independent perturbations on two strongly correlated measurements. The marginal distribution of each artificial column looks reasonable. Their joint combinations do not.\n\n\n\n\n\n\n\nFigure 3.3: Observed correlated measurements and independent LIME-style perturbations that extend far outside the observed relationship.\n\n\n\n\nUseful checks include plotting low-dimensional pairs, comparing nearest-neighbor distances of real and artificial rows, applying domain rules, and recording how much total locality weight falls on implausible rows. In a high-dimensional dataset, a two-dimensional plot cannot prove joint plausibility. A conditional generator or domain-specific simulator may be preferable, but changing the generator also changes the question being answered.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#a-regression-example",
+    "href": "practice.html#a-regression-example",
+    "title": "2  warning: false",
+    "section": "3.15 A regression example",
+    "text": "3.15 A regression example\nThe shared file also contains a continuous phenotype. It depends nonlinearly on biomarker B. Fit an XGBoost regressor, then change only the model mode and prediction function used by LIME.\n\nRPython\n\n\nreg_fit &lt;- xgb.train(\n  params = list(\n    objective = \"reg:squarederror\", max_depth = 3,\n    eta = 0.05, nthread = 1, seed = 2026\n  ),\n  data = xgb.DMatrix(as.matrix(train[, feature_cols]), label = train$phenotype),\n  nrounds = 250,\n  verbose = 0\n)\n\nreg_explainer &lt;- lime(\n  train[, feature_cols],\n  reg_fit\n)\n\nset.seed(2026)\nreg_lime &lt;- explain(\n  cases[1, feature_cols, drop = FALSE],\n  reg_explainer,\n  n_features = 5,\n  n_permutations = 5000\n)\nreg_lime[, c(\"model_prediction\", \"model_r2\", \"feature_desc\", \"feature_weight\")]\nmodel_prediction  model_r2  feature_desc                     feature_weight\n8.46                0.358   biomarker_a &lt;= -0.6554                 -4.41\n8.46                0.358   -0.6857 &lt; biomarker_b &lt;= -0.0267       -2.51\n8.46                0.358   0.7140 &lt; inflammation                  -0.88\n8.46                0.358   56.9 &lt; age &lt;= 64.7                      0.31\n8.46                0.358   -0.0155 &lt; lab_noise_1 &lt;= 0.7341        -0.07\n\n\nreg_fit = xgb.XGBRegressor(\n    n_estimators=250, max_depth=3, learning_rate=0.05,\n    random_state=2026, n_jobs=1,\n).fit(train[feature_cols], train[\"phenotype\"])\n\nreg_explainer = LimeTabularExplainer(\n    train[feature_cols].to_numpy(),\n    mode=\"regression\",\n    feature_names=feature_cols,\n    random_state=2026,\n)\n\nreg_lime = reg_explainer.explain_instance(\n    cases.loc[0, feature_cols].to_numpy(dtype=float),\n    reg_fit.predict,\n    num_features=5,\n    num_samples=5000,\n)\nprint(\"black-box prediction:\", reg_lime.predicted_value)\nprint(\"local prediction:\", float(reg_lime.local_pred[0]))\nprint(\"score:\", reg_lime.score)\nprint(reg_lime.as_list())\nblack-box prediction: 10.477\nlocal prediction: 9.520\nscore: 0.409\nbiomarker_a &lt;= -0.66              -3.217\n-0.69 &lt; biomarker_b &lt;= -0.03      -1.460\ninflammation &gt; 0.71               -0.780\n56.85 &lt; age &lt;= 64.73               0.243\n-0.02 &lt; lab_noise_1 &lt;= 0.73        0.079\n\n\n\nThe target of the surrogate is now the fitted numerical phenotype prediction. No class or probability column is involved. In the Python regression display, the package provides mirrored positive and negative label maps for visualization. The underlying local regression is fitted once to the numerical output.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#preprocessing-pipelines",
+    "href": "practice.html#preprocessing-pipelines",
+    "title": "2  warning: false",
+    "section": "3.16 Preprocessing pipelines",
+    "text": "3.16 Preprocessing pipelines\nLIME must query the exact function used for ordinary prediction. Suppose a model was trained after log transformation, imputation, one-hot encoding, and standardization. Every artificial row must pass through the fitted versions of those steps. Refitting a scaler or imputer on each artificial neighborhood changes the model and is incorrect.\nIn Python, pass pipeline.predict_proba when a scikit-learn Pipeline begins with preprocessing and accepts original columns. In R, either use a supported fitted workflow or provide predict_model() and model_type() methods whose prediction path applies the stored transformations. Create the LIME explainer from the representation you want to perturb. If the model accepts principal components but the explanation should mention genes, a gene-to-component transformation must sit inside the prediction function. LIME cannot infer that mapping.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>warning: false</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#practical-recommendations",
+    "href": "practice.html#practical-recommendations",
+    "title": "2  Using LIME in R and Python",
+    "section": "2.17 Practical recommendations",
+    "text": "2.17 Practical recommendations\n\nConfirm the class and probability column being explained.\nKeep the complete fitted preprocessing path inside the prediction function.\nInspect local R-squared and the local prediction before interpreting weights.\nRepeat explanations with several seeds and report unstable feature selection.\nTry a small range of defensible locality settings and feature counts.\nCheck correlated predictors and whether artificial rows are biologically plausible.\nUse enough features to achieve useful fidelity, but few enough to keep the explanation readable.\nPrefer held-out observations when teaching or auditing predictive behaviour.\nDo not turn one local explanation into global importance or a causal statement.\nTreat LIME as one source of evidence about model behaviour rather than ground truth about the biological system.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Using LIME in R and Python</span>"
+    ]
+  },
+  {
+    "objectID": "practice.html#summary",
+    "href": "practice.html#summary",
+    "title": "2  Using LIME in R and Python",
+    "section": "2.18 Summary",
+    "text": "2.18 Summary\nCorrect use of LIME requires more than calling plot_features() or as_list(). The model output, class order, perturbation distribution, representation, distance, locality rule, feature selection, and random seed all help define the explanation. R and Python make different default choices. In either language, local fidelity and stability determine how strongly the feature weights can be interpreted.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Using LIME in R and Python</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html",
+    "href": "mathematics.html",
+    "title": "3  How LIME works",
+    "section": "",
+    "text": "3.1 Begin with an already fitted prediction function\nLet the fitted prediction function be denoted by\n\\[\\hat f.\\]\nThe hat is a reminder that the function has already been estimated from training data. LIME begins after this fitting step. It does not estimate or alter the original model.\nLet the observation to be explained be a vector with \\(p\\) predictors,\n\\[x_0 = (x_{01},x_{02},\\ldots,x_{0p}).\\]\nFor regression, the original model’s prediction at this observation is the numerical value\n\\[\\hat f(x_0).\\]\nFor classification, an explanation must be attached to a class. If \\(c\\) is the class of interest, define\n\\[\\hat f_c(x_0)\n=\nP_{\\hat f}(Y=c\\mid x_0).\\]\nThe notation means the probability assigned to class \\(c\\) by the fitted model. It is not a claim that the fitted probability is the true biological probability.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#the-response-of-the-explanation-model",
+    "href": "mathematics.html#the-response-of-the-explanation-model",
+    "title": "3  How LIME works",
+    "section": "3.2 The response of the explanation model",
+    "text": "3.2 The response of the explanation model\nLIME creates a new local modelling problem. Its inputs are artificial observations and its responses are predictions from \\(\\hat f\\). The mapping is\n\\[Z \\longrightarrow \\hat f(Z),\\]\nnot\n\\[Z \\longrightarrow Y.\\]\nFor a classifier and class \\(c\\), the response attached to artificial observation \\(z_i\\) is\n\\[y_i^* = \\hat f_c(z_i).\\]\nThe star distinguishes this generated response from an outcome observed in nature. It is a continuous value such as 0.72 or 0.91. For regression,\n\\[y_i^* = \\hat f(z_i).\\]\nThis construction resolves an apparent mismatch. A classifier was fitted to class outcomes, yet a linear regression appears inside LIME. The regression is not being fitted to the original class labels. It is approximating a surface of predicted probabilities.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#artificial-observations",
+    "href": "mathematics.html#artificial-observations",
+    "title": "3  How LIME works",
+    "section": "3.3 Artificial observations",
+    "text": "3.3 Artificial observations\nGenerate \\(m\\) perturbed observations around the explanation problem,\n\\[z_1,z_2,\\ldots,z_m.\\]\nEach \\(z_i\\) has \\(p\\) feature values. The first row in common implementations is \\(x_0\\) itself. The remaining rows are random modifications.\nThe word around needs care. It does not necessarily mean that every value was sampled from a distribution centered on \\(x_0\\). Python LIME without discretization normally draws each continuous feature independently from a standard normal and converts it using the training mean and standard deviation. sample_around_instance=True changes the center to the explained value. With default discretization, it samples training-bin frequencies. Current R lime samples training-bin frequencies by default. Without binning, it uses a separate density estimate for each continuous column by default.\nCategorical predictors are sampled using their training frequencies in both implementations. The generated columns are therefore generally independent conditional on the package’s marginal summaries. Relationships among predictors need not be preserved.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#model-and-interpretable-representations",
+    "href": "mathematics.html#model-and-interpretable-representations",
+    "title": "3  How LIME works",
+    "section": "3.4 Model and interpretable representations",
+    "text": "3.4 Model and interpretable representations\nThe original LIME framework distinguishes a model representation \\(z_i\\) from an interpretable representation \\(z_i'\\). The black box receives \\(z_i\\). The surrogate receives \\(z_i'\\).\nFor a numerical tabular model, both representations may contain the same continuous measurements. With discretization, however, a measured biomarker value in \\(z_i\\) can become an indicator in \\(z_i'\\) such as\n\\[z_{ij}' =\n\\begin{cases}\n1, & \\text{if biomarker A is in the interval }(0.6,1.4],\\\\\n0, & \\text{otherwise.}\n\\end{cases}\\]\nFor text, an element of \\(z_i'\\) can indicate whether a word is present. For an image, it can indicate whether a superpixel is visible. The distinction allows the fitted model to use the representation it requires while the explanation uses features a person can read.\nThe rest of the main derivation writes \\(z_i\\) for the surrogate input to keep the notation light. If a separate interpretable representation is used, every occurrence of \\(z_i\\) in the surrogate design matrix should be read as \\(z_i'\\) instead.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#distance-defines-the-neighborhood",
+    "href": "mathematics.html#distance-defines-the-neighborhood",
+    "title": "3  How LIME works",
+    "section": "3.5 Distance defines the neighborhood",
+    "text": "3.5 Distance defines the neighborhood\nFor every perturbation, calculate a distance from the explained observation,\n\\[d(x_0,z_i).\\]\nRaw Euclidean distance is\n\\[d(x_0,z_i)\n=\n\\sqrt{\\sum_{j=1}^p (x_{0j}-z_{ij})^2}.\\]\nThis expression is dominated by features with large numerical scales. An age measured in years can vary by tens while a normalized gene-expression value varies by one or two. The units, rather than the model’s local behaviour, would determine what counts as nearby.\nFor continuous features, a common correction is to standardize each difference using a training-set scale \\(s_j\\):\n\\[d_{\\mathrm{scaled}}(x_0,z_i)\n=\n\\sqrt{\n\\sum_{j=1}^p\n\\left(\n\\frac{x_{0j}-z_{ij}}{s_j}\n\\right)^2\n}.\\]\nPython tabular LIME uses standardized interpretable data before its default Euclidean distance. A categorical feature is represented as one when it matches the explained value and zero otherwise. A discretized continuous feature is treated in the same match-versus-not-match form.\nDatasets containing both numerical and categorical predictors need a distance that can combine unlike types. Gower distance calculates a feature-level dissimilarity between zero and one, scaling numerical differences by their training ranges and using match or mismatch for categorical values, then averages across available features. Current R lime uses Gower distance by default. This is an implementation choice, not part of the universal definition of LIME.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#distance-becomes-locality-weight",
+    "href": "mathematics.html#distance-becomes-locality-weight",
+    "title": "3  How LIME works",
+    "section": "3.6 Distance becomes locality weight",
+    "text": "3.6 Distance becomes locality weight\nA locality kernel turns distance into an influence weight. A useful conceptual form is\n\\[\\pi_{x_0}(z_i)\n=\n\\exp\\left(\n-\\frac{d(x_0,z_i)^2}{\\sigma^2}\n\\right),\\]\nwhere \\(\\sigma&gt;0\\) is the kernel width. When \\(d=0\\), the weight is one. The weight decreases toward zero as distance grows. A small \\(\\sigma\\) gives appreciable weight only to close perturbations. A large \\(\\sigma\\) lets a broader region influence the surrogate.\nThe released Python implementation and the non-Gower path in current R lime use\n\\[\\pi_{x_0}(z_i)\n=\n\\sqrt{\n\\exp\\left(-\\frac{d(x_0,z_i)^2}{\\sigma^2}\\right)\n}\n=\n\\exp\\left(-\\frac{d(x_0,z_i)^2}{2\\sigma^2}\\right).\\]\nThe default Python width is\n\\[\\sigma = 0.75\\sqrt{p}.\\]\nFor R’s default Gower path, let \\(d_G\\) be Gower distance and let \\(q\\) be gower_pow. Similarity is\n\\[\\pi_{x_0}(z_i)=1-d_G(x_0,z_i)^q.\\]\nkernel_width is not used on that path. These exact formulas explain why changing the same-looking argument across languages does not necessarily create the same neighborhood.\n\n\n\n\n\n\n\nFigure 3.1: Exponential locality weights for three kernel widths.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#the-local-surrogate-as-weighted-regression",
+    "href": "mathematics.html#the-local-surrogate-as-weighted-regression",
+    "title": "3  How LIME works",
+    "section": "3.7 The local surrogate as weighted regression",
+    "text": "3.7 The local surrogate as weighted regression\nTake a linear surrogate from a class \\(G\\) of interpretable models:\n\\[g(z_i)\n=\n\\beta_0+\\beta_1z_{i1}+\\cdots+\\beta_pz_{ip}.\\]\nThe coefficients are chosen to minimize locally weighted squared error,\n\\[\\sum_{i=1}^{m}\n\\pi_{x_0}(z_i)\n\\left[y_i^*-g(z_i)\\right]^2.\\]\nFor regression, substituting the generated response gives\n\\[\\sum_{i=1}^{m}\n\\pi_{x_0}(z_i)\n\\left[\\hat f(z_i)-g(z_i)\\right]^2.\\]\nFor classification and class \\(c\\), it becomes\n\\[\\sum_{i=1}^{m}\n\\pi_{x_0}(z_i)\n\\left[\\hat f_c(z_i)-g(z_i)\\right]^2.\\]\nEach term compares a black-box output with a surrogate output on the same artificial row. Squaring prevents positive and negative errors from cancelling. Multiplying by \\(\\pi_{x_0}(z_i)\\) makes a mistake close to \\(x_0\\) more costly than the same mistake far away.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#matrix-form",
+    "href": "mathematics.html#matrix-form",
+    "title": "3  How LIME works",
+    "section": "3.8 Matrix form",
+    "text": "3.8 Matrix form\nPut the \\(m\\) surrogate inputs into a design matrix with a column of ones for the intercept:\n\\[Z=\n\\begin{bmatrix}\n1 & z_{11} & \\cdots & z_{1p}\\\\\n1 & z_{21} & \\cdots & z_{2p}\\\\\n\\vdots & \\vdots & \\ddots & \\vdots\\\\\n1 & z_{m1} & \\cdots & z_{mp}\n\\end{bmatrix}.\\]\nCollect the generated responses in\n\\[\\mathbf y^*=\n\\begin{bmatrix}\n\\hat f(z_1)\\\\\n\\hat f(z_2)\\\\\n\\vdots\\\\\n\\hat f(z_m)\n\\end{bmatrix}\\]\nfor regression, or replace \\(\\hat f\\) with \\(\\hat f_c\\) for classification. Put the locality weights on the diagonal of\n\\[W=\\operatorname{diag}(w_1,w_2,\\ldots,w_m),\n\\qquad\nw_i=\\pi_{x_0}(z_i).\\]\nThe weighted objective is compactly\n\\[(\\mathbf y^*-Z\\beta)^\\top W(\\mathbf y^*-Z\\beta).\\]\nDifferentiating with respect to \\(\\beta\\), setting the result to zero, and solving gives the weighted least-squares estimate\n\\[\\hat\\beta\n=\n(Z^\\top WZ)^{-1}Z^\\top W\\mathbf y^*.\\]\n\\(Z^\\top WZ\\) summarizes the weighted geometry of the artificial predictors. \\(Z^\\top W\\mathbf y^*\\) summarizes their weighted relationship with the black-box outputs. The inverse maps those summaries into the coefficient vector.\nRidge regression stabilizes the solution when columns are correlated or information is weak. Let\n\\[P=\\operatorname{diag}(0,1,\\ldots,1)\\]\nso the intercept is not penalized. The solution becomes\n\\[\\hat\\beta\n=\n(Z^\\top WZ+\\lambda P)^{-1}Z^\\top W\\mathbf y^*.\\]\nBoth packages use ridge regression for the final common tabular surrogate, though their scaling and regularization details differ.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#explanation-complexity-and-feature-selection",
+    "href": "mathematics.html#explanation-complexity-and-feature-selection",
+    "title": "3  How LIME works",
+    "section": "3.9 Explanation complexity and feature selection",
+    "text": "3.9 Explanation complexity and feature selection\nA local model using all \\(p\\) features may be faithful but not interpretable. The general LIME objective expresses both requirements:\n\\[\\xi(x_0)\n=\n\\arg\\min_{g\\in G}\n\\mathcal L(\\hat f,g,\\pi_{x_0})\n+\n\\Omega(g).\\]\nEvery component has now been constructed. \\(x_0\\) is the observation being explained. \\(G\\) is the class of permitted interpretable models. \\(\\mathcal L\\) is the loss measuring how poorly \\(g\\) reproduces \\(\\hat f\\) under locality weights \\(\\pi_{x_0}\\). \\(\\Omega(g)\\) measures or constrains explanation complexity. \\(\\xi(x_0)\\) is the selected explanation.\nPackages commonly implement complexity by requesting at most \\(K\\) features and choosing them before the final ridge fit. The practical strategies include:\n\nForward selection. Start empty and add the feature that most improves weighted regression fit at each step.\nHighest weights. Fit a ridge model using all features and retain features with the largest weighted coefficient criterion.\nLasso path. Follow a sparse regression path and choose features that persist as regularization changes.\nNo selection. Use every feature and ignore the requested maximum.\n\nThe auto setting in both packages uses forward selection when \\(K\\leq6\\) and a highest-weights strategy when \\(K&gt;6\\). R also offers a tree-based selection option. These are algorithms for constructing a sparse approximation to the general objective. They are not mathematically identical ways of solving one fixed penalty.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#a-complete-numerical-example",
+    "href": "mathematics.html#a-complete-numerical-example",
+    "title": "3  How LIME works",
+    "section": "3.10 A complete numerical example",
+    "text": "3.10 A complete numerical example\nConsider two standardized biomarkers and the observation\n\\[x_0=(1.0,1.0).\\]\nFor this example, let’s say the black-box class probability is\n\\[\\hat f_1(z)\n=\n\\frac{1}{1+\\exp[-(-0.5+1.4z_1-0.8z_2+0.5z_1z_2)]}.\\]\nThe interaction \\(z_1z_2\\) makes the function nonlinear. Generate eight rows, including \\(x_0\\), use Euclidean distance, and set the conceptual kernel width to one:\n\\[w_i=\\exp[-d(x_0,z_i)^2].\\]\n\n\n\n\\(i\\)\n\\(z_{i1}\\)\n\\(z_{i2}\\)\n\\(\\hat f_1(z_i)\\)\ndistance\nweight\n\n\n\n\n1\n1.0\n1.0\n0.6457\n0.0000\n1.0000\n\n\n2\n0.7\n1.0\n0.5075\n0.3000\n0.9139\n\n\n3\n1.3\n1.0\n0.7631\n0.3000\n0.9139\n\n\n4\n1.0\n0.7\n0.6660\n0.3000\n0.9139\n\n\n5\n1.0\n1.3\n0.6248\n0.3000\n0.9139\n\n\n6\n0.7\n0.7\n0.5412\n0.4243\n0.8353\n\n\n7\n1.3\n1.3\n0.7549\n0.4243\n0.8353\n\n\n8\n1.5\n0.6\n0.8278\n0.6403\n0.6637\n\n\n\nThe table can be reproduced from numerical_example.csv. For row 2, for example,\n\\[d(x_0,z_2)\n=\n\\sqrt{(1.0-0.7)^2+(1.0-1.0)^2}\n=0.3,\\]\nand\n\\[w_2=\\exp(-0.3^2)=0.9139.\\]\nWith an intercept and the two biomarkers, the weighted cross-products are\n\\[Z^\\top WZ\n=\n\\begin{bmatrix}\n6.9899 & 7.3217 & 6.7245\\\\\n7.3217 & 8.1343 & 7.0739\\\\\n6.7245 & 7.0739 & 6.8800\n\\end{bmatrix}\\]\nand\n\\[Z^\\top W\\mathbf y^*\n=\n\\begin{bmatrix}\n4.6185\\\\\n5.0169\\\\\n4.4411\n\\end{bmatrix}.\\]\nSubstitution into the weighted least-squares solution gives\n\\[\\hat\\beta\n=\n\\begin{bmatrix}\n0.2873\\\\\n0.3873\\\\\n-0.0335\n\\end{bmatrix}.\\]\nThe local surrogate is therefore\n\\[g(z)=0.2873+0.3873z_1-0.0335z_2.\\]\nAt the explained observation,\n\\[g(x_0)=0.2873+0.3873-0.0335=0.6411.\\]\nThe black-box probability is 0.6457, so the local prediction differs by about 0.0046. Across the eight weighted rows, the local \\(R^2\\) is 0.9869. In this constructed neighborhood the plane is a strong approximation.\n\n\n\n\n\n\n\nFigure 3.2: The nonlinear black-box probability and the fitted local plane for the numerical example. Point size represents locality weight and the star marks the explained observation.\n\n\n\n\nThe positive coefficient for biomarker A says that, within this weighted artificial neighborhood and holding the surrogate’s biomarker B coordinate fixed, larger A is associated with a larger approximation to the black-box probability. The small negative coefficient for biomarker B has the same restricted meaning. Neither is a biological intervention effect.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#linear-regression-can-approximate-probability-output",
+    "href": "mathematics.html#linear-regression-can-approximate-probability-output",
+    "title": "3  How LIME works",
+    "section": "3.11 Linear regression can approximate probability output",
+    "text": "3.11 Linear regression can approximate probability output\nThe black-box function \\(\\hat f_c(z)\\) can be nonlinear while\n\\[\\hat f_c(z)\\approx g(z)\\]\nholds in a weighted neighborhood. LIME never requires\n\\[\\hat f_c(z)=g(z)\\]\nover the full predictor space.\nA linear surrogate can produce values below zero or above one if evaluated far from its fitting neighborhood. This does not make it a calibrated probability model. It is an explanatory approximation that should not be used as a replacement classifier. Ordinary logistic regression is not required because the training targets of the surrogate are continuous probabilities, not binary outcomes.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#the-surrogate-is-not-a-taylor-approximation",
+    "href": "mathematics.html#the-surrogate-is-not-a-taylor-approximation",
+    "title": "3  How LIME works",
+    "section": "3.12 The surrogate is not a Taylor approximation",
+    "text": "3.12 The surrogate is not a Taylor approximation\nA local line can resemble a tangent, but ordinary LIME does not compute the gradient of \\(\\hat f\\) at \\(x_0\\). It samples a neighborhood, evaluates the fitted model, weights rows by proximity, selects features, and estimates a regression. Its coefficients depend on the sampled distribution and kernel, not only on derivatives at one point.\nThis distinction matters for random forests and boosted trees. Their prediction surfaces are piecewise constant and may not have a conventional smooth derivative at a split. LIME can still fit a surrogate across nearby sampled regions.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#local-fidelity",
+    "href": "mathematics.html#local-fidelity",
+    "title": "3  How LIME works",
+    "section": "3.13 Local fidelity",
+    "text": "3.13 Local fidelity\nDefine the weighted mean of the generated responses as\n\\[\\bar y_w^*\n=\n\\frac{\\sum_{i=1}^{m}w_i y_i^*}{\\sum_{i=1}^{m}w_i}.\\]\nA weighted local coefficient of determination is\n\\[R^2_{\\mathrm{local}}\n=\n1-\n\\frac{\n\\sum_{i=1}^{m}w_i[y_i^*-g(z_i)]^2\n}{\n\\sum_{i=1}^{m}w_i[y_i^*-\\bar y_w^*]^2\n}.\\]\nThe numerator is the surrogate’s weighted squared error. The denominator is the weighted error from predicting the same constant for every perturbation. Values near one indicate that the surrogate reproduces most of the local variation. A value near zero means it is little better than the weighted mean. A negative value is possible when it is worse.\nmodel_r2 in R and score in the released Python package report the local regression’s weighted \\(R^2\\). They are in-sample measures on artificial observations. They assess approximation within the generated neighborhood, not predictive accuracy on real held-out outcomes.\nTwo checks complement each other:\n\\[R^2_{\\mathrm{local}}\\]\nassesses the neighborhood as a whole, while\n\\[|g(x_0)-\\hat f_c(x_0)|\\]\nchecks the surrogate specifically at the observation being explained. A good explanation should not ignore either.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#kernel-width-changes-the-estimand",
+    "href": "mathematics.html#kernel-width-changes-the-estimand",
+    "title": "3  How LIME works",
+    "section": "3.14 Kernel width changes the estimand",
+    "text": "3.14 Kernel width changes the estimand\nSuppose three widths are used with the same black box and \\(x_0\\):\n\\[\\sigma_1&lt;\\sigma_2&lt;\\sigma_3.\\]\nThey produce three different weight matrices,\n\\[W^{(1)},W^{(2)},W^{(3)},\\]\nand therefore three coefficient estimates,\n\\[\\hat\\beta^{(k)}\n=\n(Z^\\top W^{(k)}Z+\\lambda P)^{-1}\nZ^\\top W^{(k)}\\mathbf y^*.\\]\nThe coefficient can change magnitude or sign because each width emphasizes a different part of a nonlinear surface. This is more than a software nuisance. The meaning of local is part of the question being answered. A narrow width can also produce a small effective sample size, making the fit unstable. A wide width can improve numerical stability while reducing locality.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#sampling-and-instability",
+    "href": "mathematics.html#sampling-and-instability",
+    "title": "3  How LIME works",
+    "section": "3.15 Sampling and instability",
+    "text": "3.15 Sampling and instability\nRandom perturbation produces a different design matrix on each run,\n\\[Z^{(1)},Z^{(2)},Z^{(3)},\\ldots\\]\nThe black-box responses, distances, selected features, and fitted coefficients consequently change:\n\\[\\hat\\beta^{(1)},\\hat\\beta^{(2)},\\hat\\beta^{(3)},\\ldots\\]\nIncreasing \\(m\\) usually reduces this Monte Carlo variation. Setting a seed selects one reproducible \\(Z^{(r)}\\). It does not show that another plausible perturbation sample would give the same explanation. Stability is assessed by repeating the complete process and comparing selected features, signs, magnitudes, local predictions, and fidelity.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#correlated-predictors-and-the-data-manifold",
+    "href": "mathematics.html#correlated-predictors-and-the-data-manifold",
+    "title": "3  How LIME works",
+    "section": "3.16 Correlated predictors and the data manifold",
+    "text": "3.16 Correlated predictors and the data manifold\nSuppose two biomarkers satisfy approximately\n\\[X_2=X_1+\\varepsilon,\\]\nwhere \\(\\varepsilon\\) is small. Observed rows occupy a narrow band. If the perturbation scheme samples the two columns independently, it generates combinations with high \\(X_1\\) and low \\(X_2\\), or the reverse, even though these combinations were absent from training.\n\n\n\n\n\n\n\nFigure 3.3: Independent perturbations leave the narrow manifold occupied by two correlated biomarkers.\n\n\n\n\nThe black box is then evaluated where it has little empirical support. The resulting responses \\(\\hat f(z_i)\\) can reflect arbitrary extrapolation. At the same time, columns of \\(Z\\) are nearly redundant in plausible regions. Several coefficient vectors can give similar predictions, and sparse selection may alternate between the two biomarkers.\nA conditional perturbation generator can keep samples closer to the joint distribution, but it changes the explanation procedure and requires another model for that distribution. Grouping related predictors changes the unit of explanation. Neither choice is neutral. The important point is to state the neighborhood actually used and test its consequences.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#high-dimensional-data",
+    "href": "mathematics.html#high-dimensional-data",
+    "title": "3  How LIME works",
+    "section": "3.17 High-dimensional data",
+    "text": "3.17 High-dimensional data\nWhen \\(p\\) is large, several parts of the construction become difficult.\nFirst, Euclidean distances tend to concentrate. In many high-dimensional distributions, the difference between typical near and far distances becomes small relative to the mean distance. A kernel then has difficulty separating clearly local from distant rows.\nSecond, biological predictors are often strongly correlated. Independent marginal perturbation moves increasingly far from the joint data manifold as more coordinates are changed.\nThird, selecting \\(K\\) features from thousands becomes a variable-selection problem with substantial sampling variability. A short list may look decisive even when many correlated lists fit almost equally well.\nFourth, computation grows. Each of \\(m\\) perturbations must be transformed and passed through \\(\\hat f\\), and feature selection may repeatedly fit weighted models.\nThese points do not prove that LIME is invalid when \\(p\\) is large. They imply that distance, perturbation plausibility, feature grouping, representation, stability, and fidelity need explicit investigation. Explaining pathway scores or fitted latent components can be more stable than explaining thousands of raw genes, but the biological meaning then belongs to those transformed features.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#what-is-linear-and-what-can-remain-nonlinear",
+    "href": "mathematics.html#what-is-linear-and-what-can-remain-nonlinear",
+    "title": "3  How LIME works",
+    "section": "3.18 What is linear and what can remain nonlinear",
+    "text": "3.18 What is linear and what can remain nonlinear\nThree objects should remain separate:\n\nThe biological data-generating process may be linear or nonlinear.\nThe fitted black-box model \\(\\hat f\\) may be linear or nonlinear.\nLIME is a framework for fitting an interpretable local surrogate. Common tabular implementations use a linear ridge surrogate.\n\nA nonlinear XGBoost classifier can therefore have a linear LIME explanation for one observation. The linearity applies to \\(g\\) in the selected representation and weighted neighborhood. It says nothing by itself about the global fitted model or the biological system.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "mathematics.html#the-complete-algorithm",
+    "href": "mathematics.html#the-complete-algorithm",
+    "title": "3  How LIME works",
+    "section": "3.19 The complete algorithm",
+    "text": "3.19 The complete algorithm\nFor one observation \\(x_0\\) and, in classification, one class \\(c\\):\n\nGenerate \\(m\\) artificial observations \\(z_i\\) from summaries of the training predictors.\nConvert them to interpretable representations \\(z_i'\\) when required.\nEvaluate the fitted model to obtain \\(y_i^*=\\hat f(z_i)\\) or \\(y_i^*=\\hat f_c(z_i)\\).\nCalculate distances \\(d(x_0,z_i)\\) in the chosen representation and scale.\nConvert distances into locality weights \\(w_i=\\pi_{x_0}(z_i)\\).\nSelect a small set of interpretable features.\nFit a weighted local ridge regression of \\(y_i^*\\) on the selected columns of \\(z_i'\\).\nReport the coefficients, local prediction, and fidelity diagnostics.\n\nThe method is simple enough to summarize in eight steps. Its interpretation still depends on the choices inside each step. That dependence is the reason the practical chapter treated tuning, stability, and plausibility as part of the explanation rather than optional refinements.",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>How LIME works</span>"
+    ]
+  },
+  {
+    "objectID": "exercises.html",
+    "href": "exercises.html",
+    "title": "4  Exercise: explaining breast-cancer predictions",
+    "section": "",
+    "text": "4.1 Data and setup\nThe Breast Cancer Wisconsin Diagnostic dataset contains 569 observations and 30 continuous features computed from digitized images of fine-needle aspirates of breast masses. Ten nuclear properties, including radius, texture, area, smoothness, and concavity, are summarized by their mean, standard error, and a worst value. The outcome is malignant or benign.\nThe local file contains a fixed training and test split, so R and Python use the same observations. Download breast_cancer_wisconsin.csv and exercise_cases.csv when working elsewhere.\nWolberg, W., Mangasarian, O., Street, N., and Street, W. (1993). Breast Cancer Wisconsin (Diagnostic). UCI Machine Learning Repository. doi:10.24432/C5DW2B. It is distributed under the CC BY 4.0 license.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Exercise: explaining breast-cancer predictions</span>"
+    ]
+  },
+  {
+    "objectID": "exercises.html#data-and-setup",
+    "href": "exercises.html#data-and-setup",
+    "title": "4  Exercise: explaining breast-cancer predictions",
+    "section": "",
+    "text": "RPython\n\n\nlibrary(xgboost)\nlibrary(lime)\nlibrary(ggplot2)\n\nbc &lt;- read.csv(\"data/breast_cancer_wisconsin.csv\")\ncase_ids &lt;- read.csv(\"data/exercise_cases.csv\")\nfeature_cols &lt;- setdiff(names(bc), c(\"sample_id\", \"malignant\", \"split\"))\n\ntrain &lt;- bc[bc$split == \"train\", ]\ntest &lt;- bc[bc$split == \"test\", ]\ncases &lt;- merge(test, case_ids, by = \"sample_id\")\ncases &lt;- cases[match(case_ids$sample_id, cases$sample_id), ]\n\ncat(nrow(bc), \"observations and\", length(feature_cols), \"features\\n\")\ntable(bc$malignant)\n569 observations and 30 features\n\n  0   1\n357 212\n\n\nimport numpy as np\nimport pandas as pd\nimport matplotlib.pyplot as plt\nimport xgboost as xgb\n\nfrom lime.lime_tabular import LimeTabularExplainer\nfrom sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score\n\nbc = pd.read_csv(\"data/breast_cancer_wisconsin.csv\")\ncase_ids = pd.read_csv(\"data/exercise_cases.csv\")\nfeature_cols = [c for c in bc.columns if c not in (\"sample_id\", \"malignant\", \"split\")]\n\ntrain = bc[bc[\"split\"] == \"train\"].copy()\ntest = bc[bc[\"split\"] == \"test\"].copy()\ncases = case_ids.merge(test, on=\"sample_id\", how=\"left\")\n\nprint(len(bc), \"observations and\", len(feature_cols), \"features\")\nprint(bc[\"malignant\"].value_counts().sort_index())\n569 observations and 30 features\nmalignant\n0    357\n1    212",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Exercise: explaining breast-cancer predictions</span>"
+    ]
+  },
+  {
+    "objectID": "exercises.html#exercise-1.-inspect-the-measurements",
+    "href": "exercises.html#exercise-1.-inspect-the-measurements",
+    "title": "4  Exercise: explaining breast-cancer predictions",
+    "section": "4.2 Exercise 1. Inspect the measurements",
+    "text": "4.2 Exercise 1. Inspect the measurements\nSummarize the outcome and predictors. Check for missing values and calculate the feature correlation matrix. Report at least five highly correlated pairs. Explain why radius, perimeter, and area measurements might be correlated and why this matters for a sparse LIME explanation.\nDo not remove correlated features automatically. The aim is to recognize them before interpreting the model.\n\n\n\n\n\n\nTipTip\n\n\n\nUse cor() and which(..., arr.ind = TRUE) in R. In Python, use DataFrame.corr(), keep one triangle with np.triu(), then reshape with stack(). Sort pairs by absolute correlation.\n\n\n\n\n\n\n\n\nNoteSolution\n\n\n\n\n\n\nRPython\n\n\nstopifnot(!anyNA(bc[, feature_cols]))\ncor_mat &lt;- cor(train[, feature_cols])\ncor_mat[lower.tri(cor_mat, diag = TRUE)] &lt;- NA\npair_index &lt;- which(!is.na(cor_mat), arr.ind = TRUE)\n\ncor_pairs &lt;- data.frame(\n  feature_1 = rownames(cor_mat)[pair_index[, 1]],\n  feature_2 = colnames(cor_mat)[pair_index[, 2]],\n  correlation = cor_mat[pair_index]\n)\ncor_pairs &lt;- cor_pairs[order(abs(cor_pairs$correlation), decreasing = TRUE), ]\nhead(cor_pairs, 10)\n\n\nassert not bc[feature_cols].isna().any().any()\ncor_mat = train[feature_cols].corr()\nupper = np.triu(np.ones(cor_mat.shape, dtype=bool), k=1)\ncor_pairs = (\n    cor_mat.where(upper).stack().rename(\"correlation\").reset_index()\n    .rename(columns={\"level_0\": \"feature_1\", \"level_1\": \"feature_2\"})\n)\ncor_pairs[\"absolute_correlation\"] = cor_pairs[\"correlation\"].abs()\ncor_pairs.sort_values(\"absolute_correlation\", ascending=False).head(10)\n\n\n\n\n\n\nFeature 1\nFeature 2\nTraining correlation\n\n\n\n\nmean_radius\nmean_perimeter\n0.998\n\n\nworst_radius\nworst_perimeter\n0.994\n\n\nmean_radius\nmean_area\n0.987\n\n\nmean_perimeter\nmean_area\n0.986\n\n\nworst_radius\nworst_area\n0.984\n\n\n\n\n\n\n\n\n\n\nFigure 4.1: Correlations among ten features whose strongest training-set partner has a particularly large absolute correlation.\n\n\n\n\nRadius, perimeter, and area all measure nuclear size. Mean and worst summaries of the same property are also related. Sparse selection may choose one member of such a group in one run and another member in a later run. The selected name should not be treated as uniquely responsible.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Exercise: explaining breast-cancer predictions</span>"
+    ]
+  },
+  {
+    "objectID": "exercises.html#exercise-2.-fit-and-evaluate-a-nonlinear-classifier",
+    "href": "exercises.html#exercise-2.-fit-and-evaluate-a-nonlinear-classifier",
+    "title": "4  Exercise: explaining breast-cancer predictions",
+    "section": "4.3 Exercise 2. Fit and evaluate a nonlinear classifier",
+    "text": "4.3 Exercise 2. Fit and evaluate a nonlinear classifier\nFit the supplied XGBoost specification using the fixed training rows. On the test rows, calculate AUC, accuracy, and a confusion matrix. Confirm that probability column 1 in Python and the numeric vector returned in R represent malignancy.\nExplain why good test performance is necessary before interpretation but does not prove that the model is clinically useful or causally correct.\n\n\n\n\n\n\nTipTip\n\n\n\nIn Python, inspect fit.classes_ before selecting a column from predict_proba(). In R, the binary:logistic objective returns the probability of label 1. Use roc_auc_score() in Python. The solution supplies a small rank-based AUC function for R.\n\n\n\n\n\n\n\n\nNoteSolution\n\n\n\n\n\n\nRPython\n\n\ndtrain &lt;- xgb.DMatrix(as.matrix(train[, feature_cols]), label = train$malignant)\nfit &lt;- xgb.train(\n  params = list(\n    objective = \"binary:logistic\", eval_metric = \"logloss\",\n    max_depth = 3, eta = 0.05, subsample = 0.9,\n    colsample_bytree = 0.9, nthread = 1, seed = 2026\n  ),\n  data = dtrain, nrounds = 300, verbose = 0\n)\n\ntest_probability &lt;- predict(fit, as.matrix(test[, feature_cols]))\ntest_class &lt;- as.integer(test_probability &gt;= 0.5)\nauc &lt;- function(y, p) {\n  r &lt;- rank(p); n1 &lt;- sum(y == 1); n0 &lt;- sum(y == 0)\n  (sum(r[y == 1]) - n1 * (n1 + 1) / 2) / (n1 * n0)\n}\n\ncat(\"AUC:\", round(auc(test$malignant, test_probability), 4), \"\\n\")\ncat(\"accuracy:\", round(mean(test_class == test$malignant), 4), \"\\n\")\ntable(actual = test$malignant, predicted = test_class)\nAUC: 0.9974\naccuracy: 0.9609\n      predicted\nactual  0  1\n     0 77  3\n     1  2 46\n\n\nfit = xgb.XGBClassifier(\n    n_estimators=300, max_depth=3, learning_rate=0.05,\n    subsample=0.9, colsample_bytree=0.9,\n    eval_metric=\"logloss\", random_state=2026, n_jobs=1,\n)\nfit.fit(train[feature_cols], train[\"malignant\"])\n\nprint(\"class order:\", fit.classes_)\ntest_probability = fit.predict_proba(test[feature_cols])[:, 1]\ntest_class = (test_probability &gt;= 0.5).astype(int)\nprint(\"AUC:\", round(roc_auc_score(test[\"malignant\"], test_probability), 4))\nprint(\"accuracy:\", round(accuracy_score(test[\"malignant\"], test_class), 4))\nprint(confusion_matrix(test[\"malignant\"], test_class))\nclass order: [0 1]\nAUC: 0.9977\naccuracy: 0.9688\n[[77  3]\n [ 1 47]]\n\n\n\nThe fitted models discriminate these test rows well. This does not establish transportability, calibration, fairness, clinical utility, or causal validity.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Exercise: explaining breast-cancer predictions</span>"
+    ]
+  },
+  {
+    "objectID": "exercises.html#exercise-3.-explain-three-contrasting-predictions",
+    "href": "exercises.html#exercise-3.-explain-three-contrasting-predictions",
+    "title": "4  Exercise: explaining breast-cancer predictions",
+    "section": "4.4 Exercise 3. Explain three contrasting predictions",
+    "text": "4.4 Exercise 3. Explain three contrasting predictions\nThe saved IDs identify a low-probability observation, a high-probability observation, and one near the fitted decision boundary. Explain the malignant class with five features and 5,000 perturbations. Record the black-box probability, local prediction, local R-squared, selected features, and weights. Decide how strongly each explanation should be trusted.\n\n\n\n\n\n\nTipTip\n\n\n\nUse lime() and explain(..., labels = \"1\") in R. Use LimeTabularExplainer() and explain_instance(..., labels=(1,)) in Python. Compare label_prob with model_prediction in R, or predict_proba[1] with local_pred[0] in Python. Fidelity is model_r2 in R and score in Python.\n\n\n\n\n\n\n\n\nNoteSolution\n\n\n\n\n\n\nRPython\n\n\nexplainer &lt;- lime(train[, feature_cols], fit)\nset.seed(2026)\ncase_lime &lt;- explain(\n  cases[, feature_cols], explainer, labels = \"1\",\n  n_features = 5, n_permutations = 5000\n)\ndiagnostics &lt;- unique(case_lime[, c(\n  \"case\", \"label_prob\", \"model_prediction\", \"model_r2\"\n)])\ndiagnostics$absolute_local_error &lt;- abs(\n  diagnostics$label_prob - diagnostics$model_prediction\n)\ndiagnostics\nsuppressWarnings(plot_features(case_lime))\ncase  label_prob  model_prediction  model_r2  absolute_local_error\n1       0.0001         -0.208         0.195          0.208\n2       0.5072          0.335         0.192          0.172\n3       0.9996          1.067         0.345          0.068\n\n\n\n\nR lime feature plots for the low, high, and near-boundary observations.\n\n\n\n\n\nexplainer = LimeTabularExplainer(\n    train[feature_cols].to_numpy(), mode=\"classification\",\n    feature_names=feature_cols, class_names=[\"benign\", \"malignant\"],\n    random_state=2026,\n)\ncase_rows = []\nfor _, row in cases.iterrows():\n    ans = explainer.explain_instance(\n        row[feature_cols].to_numpy(dtype=float), fit.predict_proba,\n        labels=(1,), num_features=5, num_samples=5000,\n    )\n    black_box = float(ans.predict_proba[1])\n    local = float(ans.local_pred[0])\n    case_rows.append({\n        \"case_type\": row[\"case_type\"], \"black_box\": black_box,\n        \"local_prediction\": local,\n        \"absolute_local_error\": abs(black_box - local),\n        \"local_r2\": float(ans.score),\n        \"features\": ans.as_list(label=1),\n    })\ncase_results = pd.DataFrame(case_rows)\nprint(case_results.drop(columns=\"features\"))\ncase_type             black_box  local_prediction  absolute_local_error  local_r2\nlowest probability      0.0002       0.2160              0.2158           0.2046\nhighest probability     0.9996       0.9902              0.0094           0.3453\nnear boundary           0.5095       0.1632              0.3463           0.1786\n\n\n\n\nPython LIME feature plots for the same three observations. Each panel reports the black-box probability, local prediction, and local R-squared.\n\n\n\n\n\n\nThe high-probability explanation reproduces its target point closely, although its neighborhood-wide R-squared is modest. The near-boundary surrogate misses its black-box probability and has low fidelity. Its coefficients should not be interpreted strongly.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Exercise: explaining breast-cancer predictions</span>"
+    ]
+  },
+  {
+    "objectID": "exercises.html#exercise-4.-measure-sampling-stability",
+    "href": "exercises.html#exercise-4.-measure-sampling-stability",
+    "title": "4  Exercise: explaining breast-cancer predictions",
+    "section": "4.5 Exercise 4. Measure sampling stability",
+    "text": "4.5 Exercise 4. Measure sampling stability\nRepeat the near-boundary explanation for ten seeds using 1,000 perturbations. Record seed, selected feature, weight, local R-squared, and local prediction. Repeat with 10,000 perturbations and compare selection frequencies.\n\n\n\n\n\n\nTipTip\n\n\n\nPlace the complete explanation call inside the seed loop. In R call set.seed(seed) immediately before explain(). In Python create a new LimeTabularExplainer(random_state=seed) on each iteration. Use table() or pd.crosstab() to count selection.\n\n\n\n\n\n\n\n\nNoteSolution\n\n\n\n\n\n\nRPython\n\n\nboundary_case &lt;- cases[cases$case_type == \"near boundary\", feature_cols, drop = FALSE]\nrepeat_r_lime &lt;- function(n_permutations) {\n  do.call(rbind, lapply(1:10, function(seed) {\n    set.seed(seed)\n    ans &lt;- explain(\n      boundary_case, explainer, labels = \"1\",\n      n_features = 5, n_permutations = n_permutations\n    )\n    transform(\n      ans[, c(\"feature\", \"feature_weight\", \"model_r2\", \"model_prediction\")],\n      seed = seed, n_permutations = n_permutations\n    )\n  }))\n}\nr_stability &lt;- rbind(repeat_r_lime(1000), repeat_r_lime(10000))\nas.data.frame(table(r_stability$n_permutations, r_stability$feature))\n\n\nboundary_case = cases.loc[cases[\"case_type\"] == \"near boundary\", feature_cols].iloc[0]\ndef repeat_python_lime(num_samples):\n    records = []\n    for seed in range(1, 11):\n        local_explainer = LimeTabularExplainer(\n            train[feature_cols].to_numpy(), mode=\"classification\",\n            feature_names=feature_cols, class_names=[\"benign\", \"malignant\"],\n            random_state=seed,\n        )\n        ans = local_explainer.explain_instance(\n            boundary_case.to_numpy(dtype=float), fit.predict_proba,\n            labels=(1,), num_features=5, num_samples=num_samples,\n        )\n        records.extend({\n            \"seed\": seed, \"num_samples\": num_samples,\n            \"feature\": feature, \"weight\": weight,\n            \"local_r2\": ans.score,\n            \"local_prediction\": float(ans.local_pred[0]),\n        } for feature, weight in ans.as_list(1))\n    return pd.DataFrame(records)\n\npy_stability = pd.concat([\n    repeat_python_lime(1000), repeat_python_lime(10000)\n], ignore_index=True)\npd.crosstab(py_stability[\"feature\"], py_stability[\"num_samples\"])\n\n\n\n\n\n\nPython feature condition\n1,000\n10,000\n\n\n\n\narea_error &gt; 44.91\n10\n10\n\n\nworst_concavity &lt;= 0.11\n10\n10\n\n\nworst_concave_points &lt;= 0.06\n4\n10\n\n\nworst_smoothness &lt;= 0.12\n3\n9\n\n\n83.12 &lt; worst_perimeter &lt;= 97.82\n5\n7\n\n\ncompactness_error &lt;= 0.01\n6\n1\n\n\n\nThe larger sample stabilizes some selections but does not make every feature unique. A fixed seed reproduces one run and conceals this variation.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Exercise: explaining breast-cancer predictions</span>"
+    ]
+  },
+  {
+    "objectID": "exercises.html#exercise-5.-change-complexity-and-locality",
+    "href": "exercises.html#exercise-5.-change-complexity-and-locality",
+    "title": "4  Exercise: explaining breast-cancer predictions",
+    "section": "4.6 Exercise 5. Change complexity and locality",
+    "text": "4.6 Exercise 5. Change complexity and locality\nRequest 3, 5, and 10 explanatory features for the near-boundary observation. Then change one locality setting. In Python, compare half the default kernel width, the default, and twice the default. In R, compare several gower_pow values.\n\n\n\n\n\n\nTipTip\n\n\n\nKeep the seed and perturbation count fixed so only one choice changes. Extract one copy of model_r2 and model_prediction from each R result. In Python record score and local_pred[0].\n\n\n\n\n\n\n\n\nNoteSolution\n\n\n\n\n\n\nRPython\n\n\nr_complexity &lt;- do.call(rbind, lapply(c(3, 5, 10), function(k) {\n  set.seed(2026)\n  ans &lt;- explain(\n    boundary_case, explainer, labels = \"1\",\n    n_features = k, n_permutations = 5000\n  )\n  data.frame(\n    n_features = k, model_r2 = unique(ans$model_r2),\n    local_prediction = unique(ans$model_prediction)\n  )\n}))\nr_complexity\n\nr_locality &lt;- do.call(rbind, lapply(c(0.5, 1, 2), function(power) {\n  set.seed(2026)\n  ans &lt;- explain(\n    boundary_case, explainer, labels = \"1\",\n    n_features = 5, n_permutations = 5000,\n    dist_fun = \"gower\", gower_pow = power\n  )\n  data.frame(gower_pow = power, model_r2 = unique(ans$model_r2))\n}))\nr_locality\nn_features  model_r2  local_prediction\n3             0.140       0.304\n5             0.170       0.304\n10            0.217       0.342\n\ngower_pow  model_r2\n0.5          0.171\n1.0          0.170\n2.0          0.170\n\n\ncomplexity = []\nfor k in (3, 5, 10):\n    local_explainer = LimeTabularExplainer(\n        train[feature_cols].to_numpy(), mode=\"classification\",\n        feature_names=feature_cols, class_names=[\"benign\", \"malignant\"],\n        random_state=2026,\n    )\n    ans = local_explainer.explain_instance(\n        boundary_case.to_numpy(dtype=float), fit.predict_proba,\n        labels=(1,), num_features=k, num_samples=5000,\n    )\n    complexity.append({\"n_features\": k, \"local_r2\": ans.score,\n                       \"local_prediction\": float(ans.local_pred[0])})\n\ndefault_width = 0.75 * np.sqrt(len(feature_cols))\nlocality = []\nfor width in (default_width / 2, default_width, default_width * 2):\n    local_explainer = LimeTabularExplainer(\n        train[feature_cols].to_numpy(), mode=\"classification\",\n        feature_names=feature_cols, class_names=[\"benign\", \"malignant\"],\n        kernel_width=width, random_state=2026,\n    )\n    ans = local_explainer.explain_instance(\n        boundary_case.to_numpy(dtype=float), fit.predict_proba,\n        labels=(1,), num_features=5, num_samples=5000,\n    )\n    locality.append({\"kernel_width\": width, \"local_r2\": ans.score,\n                     \"local_prediction\": float(ans.local_pred[0])})\npd.DataFrame(complexity), pd.DataFrame(locality)\nn_features  local_r2  local_prediction\n3             0.171       0.304\n5             0.202       0.175\n10            0.247       0.333\n\nkernel_width  local_r2  local_prediction\n2.054           0.215       0.305\n4.108           0.202       0.175\n8.216           0.198       0.171\n\n\n\nTen features improve R-squared but still leave a poor approximation. The local prediction is sensitive to feature count and kernel width. A longer explanation is not automatically adequate.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Exercise: explaining breast-cancer predictions</span>"
+    ]
+  },
+  {
+    "objectID": "exercises.html#exercise-6.-correlation-plausibility-and-interpretation",
+    "href": "exercises.html#exercise-6.-correlation-plausibility-and-interpretation",
+    "title": "4  Exercise: explaining breast-cancer predictions",
+    "section": "4.7 Exercise 6. Correlation, plausibility, and interpretation",
+    "text": "4.7 Exercise 6. Correlation, plausibility, and interpretation\nFor every feature appearing in the repeated explanations, identify its strongest correlated partner. Inspect at least two pairs with scatterplots. Explain how independent marginal perturbation can create combinations away from the observed cloud. Suggest one additional plausibility diagnostic in 30 dimensions.\nFinish with two statements: what the LIME analysis supports about this fitted model, and what it does not support about breast-cancer biology or patient care.\n\n\n\n\n\n\nTipTip\n\n\n\nDrop each feature’s self-correlation and use which.max(abs(values)) in R or abs().idxmax() in Python. One high-dimensional diagnostic compares each artificial row’s nearest-training-row distance with nearest-neighbor distances among real training rows.\n\n\n\n\n\n\n\n\nNoteSolution\n\n\n\n\n\n\nRPython\n\n\nselected_features &lt;- unique(r_stability$feature)\nstrongest_partner &lt;- do.call(rbind, lapply(selected_features, function(feature) {\n  values &lt;- cor(train[, feature_cols])[, feature]\n  values &lt;- values[names(values) != feature]\n  partner &lt;- names(which.max(abs(values)))\n  data.frame(feature = feature, partner = partner, correlation = values[partner])\n}))\nstrongest_partner\n\nplot(train$mean_radius, train$mean_area,\n     xlab = \"mean radius\", ylab = \"mean area\")\nplot(train$worst_concavity, train$worst_concave_points,\n     xlab = \"worst concavity\", ylab = \"worst concave points\")\n\n\ncor_mat = train[feature_cols].corr()\npartner_rows = []\nfor feature in feature_cols:\n    values = cor_mat[feature].drop(feature)\n    partner = values.abs().idxmax()\n    partner_rows.append({\n        \"feature\": feature, \"partner\": partner,\n        \"correlation\": values[partner],\n    })\npartners = pd.DataFrame(partner_rows)\n\nfig, axes = plt.subplots(1, 2, figsize=(10, 4))\naxes[0].scatter(train[\"mean_radius\"], train[\"mean_area\"], s=15, alpha=0.4)\naxes[0].set(xlabel=\"mean radius\", ylabel=\"mean area\")\naxes[1].scatter(\n    train[\"worst_concavity\"], train[\"worst_concave_points\"],\n    s=15, alpha=0.4,\n)\naxes[1].set(xlabel=\"worst concavity\", ylabel=\"worst concave points\")\nplt.tight_layout()\nplt.show()\n\n\n\n\n\n\nSelected feature\nStrongest partner\nCorrelation\n\n\n\n\narea_error\nradius_error\n0.955\n\n\nworst_perimeter\nworst_radius\n0.994\n\n\nworst_concavity\nworst_compactness\n0.895\n\n\nworst_concave_points\nmean_concave_points\n0.909\n\n\nworst_smoothness\nmean_smoothness\n0.816\n\n\n\nIndependent marginal sampling can preserve each feature’s range while breaking their joint relationship. Nearest-neighbor distances can detect artificial rows far from every real training row.\nA defensible conclusion is: under this LIME representation and neighborhood, the fitted XGBoost model locally relied on the listed size and shape measurements when producing these predictions. It does not follow that changing those measurements would change malignancy, that one selected measurement is uniquely important among correlated partners, or that the model is appropriate for clinical decisions.",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Exercise: explaining breast-cancer predictions</span>"
+    ]
+  }
+]
